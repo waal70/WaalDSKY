@@ -31,18 +31,33 @@ void lampit(byte r, byte g, byte b , int lamp) {
   
 }
 
+void(* resetFunc) (void) = 0; //declare reset function at address 0
+
 void validateAction()
 {
-    if (verb == verbLampTest) {
+
+  //int printVal = 0b0000000100000000;
+  //printVal += (int) noun;
+  //Serial.println(printVal, BIN);
+   if (verb == verbLampTest) {
         mode = modeLampTest;
         //noun = noun_old;
         newAction = false;
     }
-    else if ((verb == verbExecuteMajorMode) && (noun == nounIdleMode) && (noun < 1)) {
-        action = idleMode;
+    else if (verb == verbResetAGC) {
+        mode = modeResetAGC;
         newAction = false;
     }
-    else if ((verb == verbExecuteMajorMode) && (noun == nounPleasePerform)) {
+    //else if ((verb == verbChangeProgram) && (noun == nounIdleMode) && (noun < 1)) {
+    //    action = idleMode;
+    //    newAction = false;
+   // }
+    else if ((verb == verbChangeProgram) && (noun == nounStandby)){
+      //V36N06 - Change to standby
+        mode = modeStandby;
+        newAction = false;
+    }
+    else if (verb == verbPleasePerform) {
         action = pleasePerform;
         newAction = false;
     }    
@@ -523,12 +538,13 @@ void processVerbInputMode()
                 //noun = 0;
                 printNoun(noun);
             }
-            // wenn das neue Verb ein anderes als das neue Verb is, dann muss noun auf 0 gesetzt werden
-
+            // Check whether the new verb is allowed
             if ((verb != verbDisplayDecimal)
-                && (verb != verbExecuteMajorMode)
+                && (verb != verbChangeProgram)
                 && (verb != verbSetComponent)
                 && (verb != verbLampTest)
+                && (verb != verbPleasePerform)
+                && (verb != verbResetAGC)
                 && (verb != verbNone)) {
                 error = 1;
                 verb_error = true;
@@ -538,7 +554,6 @@ void processVerbInputMode()
             else {
                 turnOffLampNumber(lampOprErr);
                 turnOffLampNumber(lampKeyRelease);
-                //turnOffLampNumber(lampVerb);
                 setLamp(green, lampVerb);
                 mode = modeIdle;
                 count = 0;
@@ -600,9 +615,7 @@ void executeVerbInputMode()
     // inputting the verb
     setLamp(yellow, lampVerb);
     toggleKeyReleaseLamp();
-    if (error == 1) {
-        flasher();
-    }
+    if (error) flasher();
     keyValue = readKeyboard();
     processVerbInputMode();
 }
@@ -631,9 +644,9 @@ void processNounInputMode()
             fresh = false;
             if ((noun != nounIMUAttitude)
                 && (noun != nounIdleMode)
-                && (noun != nounPleasePerform)
                 && (noun != nounIMUgyro)
                 && (noun != nounCountUpTimer)
+                && (noun != nounStandby)
                 && (noun != nounClockTime)
                 && (noun != nounLatLongAltitude)
                 && (noun != nounRangeTgoVelocity)
@@ -1110,7 +1123,23 @@ void actionApollo13Startup()
   action = actionReadTime;
   validateAction();
 }
+void actionStandbyMode(){
+  // VERB 50 NOUN 25
+  clearRegister(1);
+  clearRegister(2);
+  clearRegister(3);
+  delay(100);
+  printProg(0);
+  printVerb(50);
+  printNoun(25);
+  printRegister(1, 62); // This means press PRO to continue;
+  while (readKeyboard() != keyProceed)
+  {
+    delay(250);
+  }
+  resetFunc();
 
+}
 void actionIdleMode()
 {
   ledControl.setRow(0,2,B01111110);
@@ -2000,7 +2029,7 @@ void checkClockIndic()
     }
 
 }
-  
+
 void setup()
 {
     pinMode(A0, INPUT);
@@ -2058,7 +2087,7 @@ void loop()
 {    
     timer.tick(); // toggle on / off
     checkClockIndic(); // checks whether to display the clock pixel
-    
+
     if (currentProgram == programJFKAudio) {
         //jfk(4);
         playTrack(JFK);
@@ -2103,49 +2132,33 @@ void loop()
         clearRegister(2);
         clearRegister(3);
     }
-    if (stbyToggle == 1)
-    {
-        setLamp(white, lampSTBY);
-    }
-    if(action == apollo13Startup)
-    {
-      setLamp(off, lampSTBY);
-    }
+    if (stbyToggle) setLamp(white, lampSTBY);
+    if (action == apollo13Startup) turnOffLampNumber(lampSTBY);
         
-    if (mode == modeIdle) 
-    {
-        executeIdleMode();
-        if (action == none || stbyToggle == 1)
-        {
-            setLamp(white, lampSTBY);
-        }
-        else if (action != none && stbyToggle == 1)
-        {
-            setLamp(white, lampSTBY);
-        }
-        else if (action != none)
-        {
-            setLamp(off, lampSTBY);
-        }
-    }
-
-    
+    if (mode == modeIdle) executeIdleMode();
     else if (mode == modeInputVerb) {
         executeVerbInputMode();
-        setLamp(off, lampSTBY);
-
+        turnOffLampNumber(lampSTBY);
     }
     else if (mode == modeInputNoun) {
         executeNounInputMode();
-        setLamp(off, lampSTBY);
+        turnOffLampNumber(lampSTBY);
     }
     else if (mode == modeInputProgram) {
         executeProgramInputMode();
-        setLamp(off, lampSTBY);
+        turnOffLampNumber(lampSTBY);
     }
     else if (mode == modeLampTest) {
-        setLamp(off, lampSTBY);
+        turnOffLampNumber(lampSTBY);
         executeLampTestModeWithDuration(2000);
+    }
+    else if (mode == modeResetAGC){
+        setLamp(yellow, lampRestart);
+        delay(500);
+        resetFunc();
+    }
+    else if (mode == modeStandby){
+        actionStandbyMode();
     }
     if (action == displayIMUAttitude) {
         actionReadIMU(Accel);  // V16N17 ReadIMU Accel

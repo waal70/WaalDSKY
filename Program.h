@@ -16,7 +16,8 @@ enum Action: int {
     countUpTimer                = 11,
     idleMode                    = 12,
     pleasePerform               = 13,
-    apollo13Startup             = 14
+    apollo13Startup             = 14,
+    resetAGC                    = 15    
 };
 
 enum Mode: int {
@@ -24,7 +25,9 @@ enum Mode: int {
     modeInputVerb           = 1,
     modeInputNoun           = 2,
     modeInputProgram        = 3,
-    modeLampTest            = 4
+    modeLampTest            = 4,
+    modeResetAGC            = 5,
+    modeStandby             = 6
 };
 
 enum programNumber: int {
@@ -93,19 +96,21 @@ enum keyValues: int
 };
 
 enum verbValues: int
-{ // Verbs 0,35,16,21
+{ // Verbs 0,35,36,37,16,21
     verbNone                = 0,
-    verbLampTest            = 35,    
-    verbExecuteMajorMode    = 37,
-    verbDisplayDecimal      = 16,
-    verbSetComponent        = 21
+    verbLampTest            = 35, //UNUSED - RELEASE DSKY
+    verbResetAGC            = 36, //FRESH START   
+    verbChangeProgram       = 37, //CHANGE PROGRAM (MAJOR MODE)
+    verbPleasePerform       = 50, //PLEASE PERFORM
+    verbDisplayDecimal      = 16, //MONITOR DECIMAL
+    verbSetComponent        = 21  //LOAD COMP 1
 };
 
 enum nounValues: int 
 { // Nouns 0,17,36,37,43,68,98
     nounNone                = 0,
     nounIdleMode            = 00,
-    nounPleasePerform       = 6,
+    nounStandby             = 6,
     nounIMUAttitude         = 17,
     nounIMUgyro             = 18,
     nounApollo13StartUp     = 20,
