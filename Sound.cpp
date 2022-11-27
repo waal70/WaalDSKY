@@ -55,3 +55,8 @@ void playTrack(uint16_t track)
   myMP3.play(track);
   delay(1000);
 }
+
+void stopMP3()
+{
+  myMP3.stop();
+}

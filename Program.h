@@ -1,5 +1,6 @@
 #ifndef PROGRAM_H
 #define PROGRAM_H
+
 enum Action: int {
     none                        = 0,
     displayIMUAttitude          = 1,
@@ -209,8 +210,8 @@ int radarAltitude = 3231;
 int lat = 0;
 int lon = 0;
 int alt = 0;
-uint32_t oneSecTimer = millis();
-uint32_t pressedTimer2 = millis();
+uint32_t oneSecTimer;
+uint32_t pressedTimer2;
 
 // IMU https://github.com/griegerc/arduino-gy521/blob/master/gy521-read-angle/gy521-read-angle.ino
 const int ACCEL_OFFSET   = 200;
@@ -242,45 +243,26 @@ bool gpsfix = false;
 // variables for Time display (10th of a second, 100th of a second)
 unsigned long previousMillis = 0;
 int oldSecond = 0;
-uint32_t flashTimer = millis();
-uint32_t pressedTimer = millis();
+uint32_t flashTimer;
+uint32_t pressedTimer;
 
 // This is the 1 second toggle timer
-bool toggle_timer(void *)
+bool toggle_timer()
 {
   global_state_1sec = !global_state_1sec;
   toggle = !toggle;
-  //Errrm, I think this should just be able to switch state
-  //if(global_state_1sec==false){
-  //  global_state_1sec=true;
-  //  toggle = true;
-  //}
-  //else
-  //{
-  //  global_state_1sec=false;
-  //  toggle = false;
-  //}
   return true; // repeat? true
 }
 
 // 600msec toggle
-bool toggle_timer_600(void *)
+bool toggle_timer_600()
 {
   global_state_600msec = !global_state_600msec;
   toggle600 = !toggle600;
-  //if(global_state_600msec==false){
-  //  global_state_600msec=true;
-  //  toggle600 = true;
-  //}
-  //else
-  //{
-  //  global_state_600msec=false;
-  //  toggle600 = false;
-  //}
-  return true; // repeat? true
+   return true; // repeat? true
 }
 
-bool toggle_timer_250(void *) {
+bool toggle_timer_250() {
   toggle250 = !toggle250;
   return true; // repeat? true
 }
@@ -339,4 +321,4 @@ int readKeyboard() {
         // no key
     }
 }
-#endif
+#endif //Program.h

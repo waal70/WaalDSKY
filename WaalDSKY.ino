@@ -1,20 +1,20 @@
-#include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
 #include "LedControl.h"
 #include "RTClib.h"
-#include "RTClib.h"
 #include <TinyGPS++.h>
-#include<Wire.h>
+#include <Wire.h>
 #include <arduino-timer.h>
 #include "Program.h"
 #include "Sound.h"
-#include "Program.h"
+
 #define PIN            6
 #define NUMPIXELS      18
 #define GPS_SW         7 
 
 int clipnum = COMPUTERS; //Computers now have control
 int clipcount = NUM_TRACKS -1; // Because of the enum being zero-based
+
+int descentCounter = 0;
 
 Adafruit_NeoPixel neoPixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 LedControl ledControl = LedControl(12,10,11,4);
@@ -98,9 +98,6 @@ void validateAction()
         newAction = false;
     }
 }
-
-    
-
     
 void illuminateWithRGBAndLampNumber(byte r, byte g, byte b, int lamp) {
     neoPixels.setPixelColor(lamp, neoPixels.Color(r,g,b));
@@ -1607,72 +1604,46 @@ void actionReadIMU(int imumode)
         readIMU(imumode);
     }
 }
-    
+
 void lunarDecentSim(){
+  
   digitalWrite(5, LOW);
-  lampit(0,0,0, 16);
+  setLamp(off, lampNoAtt);
   int totalSeconds = 260;
   uint32_t timer2 = millis();
   uint32_t alarmTimer = millis();
-  int currentSeconds=0;
+  uint32_t descentStart = millis();
+  descentCounter = (millis() - descentStart)/1000;
   toggle = 0;
-  toggle1201 = 0;
+  toggle1201 = false;
   toggle1202 = 0;
   alarmStatus = 0;
-  while(currentSeconds < totalSeconds){
-    if(toggle)
-    {
-      lampit(100,100,0,6);
-    }
-    
+  while(descentCounter < totalSeconds){ //
+    descentCounter = (millis() - descentStart)/1000;
+ 
+ ///============1201 issue
     if(toggle1201)
     {
-    alarmStatus = 1;
-    toggle1201 = 0;
-    valueForDisplay[4]= 1201;
-    valueForDisplay[5]= 1201;
-    setDigits();
-      for(int i=1;i<4;i++) 
-      {
-        ledControl.setRow(i,0,B00000000);
-        ledControl.setRow(i,1,B00000000); 
-        if(i == 3)
-        {
-          for(int d=0;d<6;d++) 
-          {
-           ledControl.setRow(i,d,B00000000);
-          }
-        }
-      }      
+      alarmStatus = 1;
+      toggle1201 = 0;
+      printRegister(1,1201,false);
+      printRegister(2,1201,false);
     }
     
     if(toggle1202)
     {
-    alarmStatus = 1;
-    toggle1202 = 0;
-    valueForDisplay[4]= 1202;
-    valueForDisplay[5]= 1202;
-    setDigits();
-      for(int i=1;i<4;i++) 
-      {
-        ledControl.setRow(i,0,B00000000);
-        ledControl.setRow(i,1,B00000000); 
-        if(i == 3)
-        {
-          for(int d=0;d<6;d++) 
-          {
-           ledControl.setRow(i,d,B00000000);
-          }
-        }
-      }      
+      alarmStatus = 1;
+      toggle1202 = 0;
+      printRegister(1,1202,false);
+      printRegister(2,1202,false);
      } 
 
-    if(currentSeconds == 8)
+    if(descentCounter == 8)
     {
       radarAltitude = 3000;  
     }
 
-    if (currentSeconds == 18)
+    if (descentCounter == 18)
       {
       alarmStatus = 0;
       toggle = 0;
@@ -1681,92 +1652,89 @@ void lunarDecentSim(){
       alarmTimer = millis(); // reset the timer
       }
 
-    if(currentSeconds == 24)
+    if(descentCounter == 24)
     {
       radarAltitude = 2000;  
     }
 
-    if(currentSeconds == 59)
+    if(descentCounter == 59)
     {
       radarAltitude = 700;
-      verticalSpeed = 100;  
+      verticalSpeed = -100;  
     }
 
-    if(currentSeconds == 69)
+    if(descentCounter == 69)
     {
       radarAltitude = 540; 
-      verticalSpeed = 300;  
+      verticalSpeed = -300;  
     }
 
-    if(currentSeconds == 78)
+    if(descentCounter == 78)
     {
       fwdVelocity = 40;
       radarAltitude = 400; 
-      verticalSpeed = 90;  
+      verticalSpeed = -90;  
     }
     
-    if(currentSeconds == 140)
+    if(descentCounter == 140)
     {
       radarAltitude = 250; 
-      verticalSpeed = 40;  
+      verticalSpeed = -40;  
     }    
     
-    if(currentSeconds == 160)
+    if(descentCounter == 160)
     {
       radarAltitude = 200; 
-      verticalSpeed = 35;  
+      verticalSpeed = -35;  
     }
 
-    if(currentSeconds == 170)
+    if(descentCounter == 170)
     {
       radarAltitude = 100; 
-      verticalSpeed = 15;  
+      verticalSpeed = -15;  
     }
 
-     if(currentSeconds == 180)
+     if(descentCounter == 180)
     {
       radarAltitude = 70; 
-      verticalSpeed = 10;  
+      verticalSpeed = -10;  
     }
 
-     if(currentSeconds == 190)
+     if(descentCounter == 190)
     {
       fwdVelocity = 19;
       radarAltitude = 50; 
-      verticalSpeed = 25;  
+      verticalSpeed = -25;  
     }
 
-   if(currentSeconds == 200)
+   if(descentCounter == 200)
     {
       fwdVelocity = 6;
       radarAltitude = 20; 
-      verticalSpeed = 10;  
+      verticalSpeed = -10;  
     }
 
-    if(currentSeconds == 220)
+    if(descentCounter == 220)
     {
       fwdVelocity = 14;
       radarAltitude = 10; 
-      verticalSpeed = 4;  
+      verticalSpeed = -4;  
     }
 
     
   /////////////////////////
   //     1201 Alarm     //
   /////////////////////// 
-    if(currentSeconds > 8 && currentSeconds < 18)
+    if(descentCounter > 8 && descentCounter < 18)
       {       
        toggle = 1;
-       if(currentSeconds < 10)
+       if(descentCounter < 10)
        {
-        for(int i=1;i<4;i++) { 
-          for(int d=0;d<6;d++) 
-          {
-           ledControl.setRow(i,d,B00000000);
-          }
-        }
+        clearRegister(1);
+        clearRegister(2);
+        clearRegister(3);
        }
-       if(currentSeconds > 10 && !alarmStatus)
+       if(descentCounter > 10 && !alarmStatus)
        {
         toggle1201 = 1;
        }       
@@ -1780,7 +1748,7 @@ void lunarDecentSim(){
         alarmTimer = millis(); // reset the timer
       }
   }
-       
+    
   /////////////////////////
   //       END 1201     //
   ///////////////////////   
@@ -1788,18 +1756,15 @@ void lunarDecentSim(){
    ////////////////////////
   //     1202 Alarm     //
   /////////////////////// 
-      if(currentSeconds > 43 && currentSeconds < 48){
+      if(descentCounter > 43 && descentCounter < 48){
        toggle = 1;
-       if(currentSeconds < 45)
+       if(descentCounter < 45)
        {
-        for(int i=1;i<4;i++) { 
-          for(int d=0;d<6;d++) 
-          {
-           ledControl.setRow(i,d,B00000000);
-          }
-        }
+        clearRegister(1);
+        clearRegister(2);
+        clearRegister(3); 
        }
-       if(currentSeconds > 44 && !alarmStatus)
+       if(descentCounter > 44 && !alarmStatus)
        {
         toggle1202 = 1;
        }
@@ -1813,7 +1778,7 @@ void lunarDecentSim(){
         alarmTimer = millis(); // reset the timer
       }     
   }
-  if (currentSeconds == 50)
+  if (descentCounter == 50)
   {
     toggle = 0;
     toggle1202 = 0;
@@ -1828,10 +1793,10 @@ void lunarDecentSim(){
   /////////////////////////
   //     PROGRAM 65     //
   /////////////////////// 
-  if (currentSeconds > 75 && currentSeconds <= 82) 
+  if (descentCounter > 75 && descentCounter <= 82) 
   {
     printProg(65);
-    if(currentSeconds > 75 && currentSeconds <= 80)
+    if(descentCounter > 75 && descentCounter <= 80)
     {
     printVerb(06);
     printNoun(60);
@@ -1847,7 +1812,7 @@ void lunarDecentSim(){
     }     
   }
 
-  if (currentSeconds > 80 && currentSeconds <= 92)
+  if (descentCounter > 80 && descentCounter <= 92)
   {
       printNoun(68);
       printVerb(16);
@@ -1856,10 +1821,10 @@ void lunarDecentSim(){
   /////////////////////////
   //     PROGRAM 66     //
   /////////////////////// 
-  if (currentSeconds > 92 && currentSeconds <= 99) 
+  if (descentCounter > 92 && descentCounter <= 99) 
   {
     printProg(66);
-    if(currentSeconds > 75 && currentSeconds <= 98)
+    if(descentCounter > 75 && descentCounter <= 98)
     {
     if (alarmTimer > millis())  alarmTimer = millis();
       if (millis() - alarmTimer >= 500 && millis() - alarmTimer < 1000) 
@@ -1871,7 +1836,7 @@ void lunarDecentSim(){
         alarmTimer = millis(); // reset the timer
       }
     }
-    if (currentSeconds > 98)
+    if (descentCounter > 98)
     {
       ledControl.setIntensity(0, 15);
     }     
@@ -1879,14 +1844,14 @@ void lunarDecentSim(){
    ////////////////////////
   //  ALT & VEL LIGHTS  //
  //////////////////////// 
-      if(currentSeconds >= 134 && currentSeconds < 199){
+      if(descentCounter >= 134 && descentCounter < 199){
         setLamp(yellow, lampAlt);
         setLamp(yellow, lampVel);
       }
   /////////////////////////
   //   END ALT & VEL    //
  ////////////////////////   
-      if(!toggle && !toggle1201 && !toggle1202 && currentSeconds < 256)
+      if(!toggle && !toggle1201 && !toggle1202 && descentCounter < 256)
       {
         setLamp(off, lampProgCond);
         if (timer2 > millis())  timer2 = millis();
@@ -1896,49 +1861,38 @@ void lunarDecentSim(){
         verticalSpeed = verticalSpeed + randNumb;
         radarAltitude = radarAltitude - randNumb;
          
-         if (fwdVelocity < 0)
-         {
-          fwdVelocity = 0; 
-         }
-         if (verticalSpeed > 0)
-         {
-          verticalSpeed = 0; 
-         }
-         if (radarAltitude < 0)
-         {
-          radarAltitude = 0; 
-         }
+         if (fwdVelocity < 0) fwdVelocity = 0; 
+         if (radarAltitude < 0) radarAltitude = 0; 
+         if (verticalSpeed > 0) verticalSpeed = 0;
 
-         if(currentSeconds > 225) 
+         if(descentCounter > 225) 
          {
           fwdVelocity = 0; 
           verticalSpeed = 0; 
           radarAltitude = 0; 
          }
-          valueForDisplay[4]= fwdVelocity;
-          valueForDisplay[5]= verticalSpeed;
-          valueForDisplay[6]= radarAltitude;
-          setDigits();
-          ledControl.setRow(2, 0, B00100100);            
+          printRegister(1, fwdVelocity);
+          printRegister(2, verticalSpeed);
+          printRegister(3, radarAltitude);
           timer2 = millis(); // reset the timer
         }
       }
-      if(toggle == 0 && currentSeconds > 225)
+      if(toggle == 0 && descentCounter > 225)
       {
         setLamp(off, lampAlt);
         setLamp(off, lampVel);
       }
-      if(toggle == 0 && currentSeconds > 226)
+      if(toggle == 0 && descentCounter > 226)
       {
         setLamp(white, lampNoAtt);
         setLamp(off, lampVel);
       }
       
       if (activityTimer > millis())  activityTimer = millis();
-      if (millis() - activityTimer >= 1000) {
-          currentSeconds++;
-          activityTimer = millis(); // reset the timer
-      }
+      //if (millis() - activityTimer >= 1000) {
+      //    descentCounter++;
+      //    activityTimer = millis(); // reset the timer
+      //}
       if (compActivityTimer > millis())  compActivityTimer = millis();
       if (millis() - compActivityTimer >= 200) {
           compActivityTimer = millis(); // reset the timer
@@ -1947,7 +1901,7 @@ void lunarDecentSim(){
             compAct();
           }
       }
-      if(toggle == 0 && currentSeconds >= 248)
+      if(toggle == 0 && descentCounter >= 248)
       {
         digitalWrite(5, LOW);
         setLamp(off, lampUplinkActy);

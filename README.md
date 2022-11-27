@@ -60,7 +60,8 @@ Some of the sounds are from Discovery: https://www.nasa.gov/connect/sounds/index
 
 This heading details some of the design decisions taken
 
-* Initial State: PROG lights up yellow, VERB, NOUN, PROG and COMP ACTY lights are all green
+* Initial State: Progam condition light: yellow
+* Initial State: Verb and Noun code display, Progam number display: green
 
 ## DSKY interface names
 [![DSKY interface](https://upload.wikimedia.org/wikipedia/commons/f/f1/Apollo_DSKY_interface.svg)](https://en.wikipedia.org/wiki/Apollo_Guidance_Computer#DSKY_interface)

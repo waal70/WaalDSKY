@@ -25,4 +25,5 @@ typedef enum TRACKS_ENUM
 
 extern void soundSetup(void);
 extern void playTrack(uint16_t track);
+extern void stopMP3(void);
 #endif
