@@ -6,6 +6,7 @@ OpenDSKY is a trademark of S&T GeoTronics LLC  https://opendsky.com
 This repository was based off of https://github.com/scottpav/OpenDSKY
 
 Where possible, it follows the Apollo 11 Flight Plan: https://www.nasa.gov/specials/apollo50th/pdf/a11final-fltpln.pdf
+Where possible, it mimics the Apollo 11 AGC, using the excellent simulator: https://www.ibiblio.org/apollo/
 
 ## Functions implemented
 
@@ -54,3 +55,13 @@ Some of the sounds are from Discovery: https://www.nasa.gov/connect/sounds/index
 > Led Control: https://github.com/wayoda/LedControl
 
 > RTCLib: https://github.com/adafruit/RTClib
+
+## Design stuff
+
+This heading details some of the design decisions taken
+
+* Initial State: PROG lights up yellow, VERB, NOUN, PROG and COMP ACTY lights are all green
+
+## DSKY interface names
+[![DSKY interface](https://upload.wikimedia.org/wikipedia/commons/f/f1/Apollo_DSKY_interface.svg)](https://en.wikipedia.org/wiki/Apollo_Guidance_Computer#DSKY_interface)
+

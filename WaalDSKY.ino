@@ -14,14 +14,14 @@
 #define GPS_SW         7 
 
 int clipnum = COMPUTERS; //Computers now have control
-int clipcount = NUM_TRACKS -1;
+int clipcount = NUM_TRACKS -1; // Because of the enum being zero-based
 
 Adafruit_NeoPixel neoPixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 LedControl ledControl = LedControl(12,10,11,4);
 RTC_DS1307 realTimeClock;
 const int MPU_addr=0x69;  // I2C address of the MPU-6050
 auto timer = timer_create_default();
-TinyGPSPlus gps;
+TinyGPSPlus gps; //TODO: Decide on the use of TinyGPSPlus
 uint32_t activityTimer = millis();
 uint32_t compActivityTimer = millis();
 
