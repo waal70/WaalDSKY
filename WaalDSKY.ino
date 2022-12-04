@@ -45,74 +45,86 @@ void(* resetFunc) (void) = 0; //declare reset function at address 0
 void validateAction()
 {
 //TODO: implement switch cases here
-   if (verb == verbLampTest) {
-        mode = modeLampTest;
-        newAction = false;
-    }
-    else if (verb == verbResetAGC) {
-        mode = modeResetAGC;
-        newAction = false;
-    }
-    else if ((verb == verbChangeProgram) && (noun == nounStandby)){
-      //V36N06 - Change to standby
-        mode = modeStandby;
-        newAction = false;
-    }
-    else if (verb == verbPleasePerform) {
-        action = pleasePerform;
-        newAction = false;
-    }    
-    else if ((verb == verbDisplayDecimal) && (noun == nounApollo13StartUp)) {
-        action = apollo13Startup;
-        newAction = false;
-    }
-    else if ((verb == verbDisplayDecimal) && (noun == nounIMUAttitude)) {
-        action = displayIMUAttitude;
-        newAction = false;
-    }
-    else if ((verb == verbDisplayDecimal) && (noun == nounIMUgyro)) {
-        action = displayIMUGyro;
-        newAction = false;
-    }
-     else if ((verb == verbDisplayDecimal) && (noun == nounCountUpTimer)) {
-        timerSeconds = 0;
-        timerMinutes = 0;
-        timerHours   = 0;
-        action = countUpTimer;
-        newAction = false;
-    }
-    else if ((verb == verbDisplayDecimal) && (noun == nounClockTime)) {
-        action = displayRealTimeClock;
-        newAction = false;
-    }
-    else if ((verb == verbDisplayDecimal) && (noun == nounLatLongAltitude)) {
-        // Display current GPS
-        action = displayGPS;
-        newAction = false;
-        count = 0;
-    }
-    else if ((verb == verbDisplayDecimal) && (noun == nounRangeTgoVelocity)) {
-       // Display Range With 1202 ERROR
-       action = lunarDecent;
-       newAction = false;
-    }
-    else if ((verb == verbSetComponent) && (noun == nounClockTime)) {
-        action = setTime;
-        newAction = false;
-    }
-    else if ((verb == verbSetComponent) && (noun == nounDate)) {
-        action = setDate;
-        newAction = false;
-    }
-    else if ((verb == verbSetComponent) && (noun == nounSelectAudioclip)) {
-        action = PlayAudioclip;
-        newAction = false;
-    }
-    else {
-        // not (yet) a valid verb/noun combination
-        action = actionNone;
-        newAction = false;
-    }
+
+	switch (verb) {
+	case verbLampTest:
+		mode = modeLampTest;
+		newAction = false;
+		break;
+	case verbResetAGC:
+		mode = modeResetAGC;
+		newAction = false;
+		break;
+	case verbChangeProgram: //V37
+		switch (noun){
+		case nounStandby: //V37N06
+			mode = modeStandby;
+			newAction = false;
+			break; //nounStandby
+		}
+		break; //verbChangeProgram
+	case verbPleasePerform:
+		action = pleasePerform;
+		newAction = false;
+		break;
+	case verbDisplayDecimal: //V16
+		switch (noun){
+		case nounApollo13StartUp: //V16N
+			action = apollo13Startup;
+			newAction=false;
+			break;
+		case nounIMUAttitude:
+			action = displayIMUAttitude;
+			newAction=false;
+			break;
+		case nounIMUgyro:
+			action = displayIMUGyro;
+			newAction = false;
+			break;
+		case nounCountUpTimer:
+			timerSeconds = 0;
+			timerMinutes = 0;
+			timerHours = 0;
+			action = countUpTimer;
+			newAction = false;
+			break;
+		case nounClockTime:
+			action = displayRealTimeClock;
+			newAction = false;
+			break;
+		case nounLatLongAltitude:
+			action = displayGPS;
+			newAction = false;
+			count = 0;
+			break;
+		case nounRangeTgoVelocity:
+			action = lunarDescent;
+			newAction = false;
+			break;
+		break; //display decimal
+		} //switch noun
+		break; //case displaydecimal
+		case verbSetComponent:
+			switch (noun) {
+			case nounClockTime:
+				action = setTime;
+				newAction = false;
+				break;
+			case nounDate:
+				action = setDate;
+				newAction = false;
+				break;
+			case nounSelectAudioclip:
+				action = PlayAudioclip;
+				newAction = false;
+				break;
+			}
+			break; //verbSetComponent
+			default:
+				action = actionNone;
+				newAction = false;
+				break;
+	}
 }
     
 void illuminateWithRGBAndLampNumber(byte r, byte g, byte b, int lamp) {
@@ -442,19 +454,9 @@ void processIdleMode()
     	case keyVerb:
     		mode = modeInputVerb;
     		newKeyPressed=false;
-    		//Safeguard this piece of code, seems to save the old verb
-//            byte keeper = verb;
-//            for (int index = 0; keeper >= 10 ; keeper = (keeper - 10)) {
-//                index++;
-//                verbOld[0] = index;
-//            }
-//            for (int index = 0; keeper >= 1; keeper = (keeper - 1)) {
-//                index++;
-//                verbOld[1] = index;
-//            }
-    		break;
+     		break;
     	case keyNoun:
-    		mode = modeInputVerb;
+    		mode = modeInputNoun;
     		newKeyPressed=false;
     		break;
     	case keyProceed:
@@ -462,7 +464,7 @@ void processIdleMode()
     		newKeyPressed=false;
     		break;
     	case keyReset:
-    		globalError = false;
+    		clearAllErrors();
     		newKeyPressed = false;
     		break;
     	 default:
@@ -561,6 +563,7 @@ void processVerbInputMode()
                 turnOffLampNumber(lampOprErr);
                 turnOffLampNumber(lampKeyRelease);
                 setLamp(green, lampVerb);
+                count = 0;
                 mode = modeIdle;
                 clearAllErrors();
                 newAction = true;
@@ -572,6 +575,7 @@ void processVerbInputMode()
                 mode = modeOld;
                 turnOffLampNumber(lampKeyRelease);
                 setLamp(green, lampVerb);
+                count = 0;
                 newKeyPressed = false;
                 if (verb == verbNone) {
                     printVerb(verb);
@@ -582,12 +586,14 @@ void processVerbInputMode()
             }
             else if (keyValue == keyNoun) {
                 mode = modeInputNoun;
+                count = 0;
                 setLamp(green, lampVerb);
                 newKeyPressed = false;
             }
             else if (keyValue == keyProceed) {
                    mode = modeInputProgram;
                   //turnOffLampNumber(lampVerb);
+                   count = 0;
                   setLamp(green, lampVerb);
                   newKeyPressed = false;
             }
@@ -617,85 +623,85 @@ void executeVerbInputMode()
 
 void processNounInputMode()
 {
-    if (keyValue == oldKeyValue) {
-        newKeyPressed = false;
-    }
-    else {
-        newKeyPressed = true;
-        oldKeyValue = keyValue;
-        if ((isError(errorMaster)) && (keyValue == keyReset)) {
-        	clearSpecificError(errorMaster);
-        	clearSpecificError(errorNoun);
-            setLamp(green, lampNoun);
-            turnOffLampNumber(lampOprErr);
-            newKeyPressed = false;
-        } //active error and RSET pressed
+	if (keyValue == oldKeyValue) {
+		newKeyPressed = false;
+	}
+	else {
+		newKeyPressed = true;
+		oldKeyValue = keyValue;
+		if ((isError(errorMaster)) && (keyValue == keyReset)) {
+			clearSpecificError(errorMaster);
+			clearSpecificError(errorNoun);
+			setLamp(green, lampNoun);
+			turnOffLampNumber(lampOprErr);
+			newKeyPressed = false;
+		} //active error and RSET pressed
 
-        if ((keyValue == keyEnter) && (newKeyPressed)) {
-            newKeyPressed = false;
-            nounOld[1]= noun % 10;
-            nounOld[0]= noun - nounOld[1] / 10;
-            noun = ((nounNew[0] * 10) + (nounNew[1]));
-            if ((noun != nounIMUAttitude)
-                && (noun != nounIdleMode)
-                && (noun != nounIMUgyro)
-                && (noun != nounCountUpTimer)
-                && (noun != nounStandby)
-                && (noun != nounClockTime)
-                && (noun != nounLatLongAltitude)
-                && (noun != nounRangeTgoVelocity)
-                && (noun != nounSelectAudioclip)
-                && (noun != nounNone)) {
-                noun = ((nounOld[0] * 10) + nounOld[1]);    // restore prior noun
-                setError(errorNoun);
-                setLamp(green, lampNoun);
-            }
-            else {
-                turnOffLampNumber(lampOprErr);
-                turnOffLampNumber(lampKeyRelease);
-                setLamp(green, lampNoun);
-                mode = modeIdle;
-                count = 0;
-                newKeyPressed = false;
-                clearAllErrors();
-                newAction = true;
-            }
-        }
-        if ((keyValue == keyRelease) && (newKeyPressed)) {
-            mode = modeOld;
-            turnOffLampNumber(lampKeyRelease);
-            setLamp(green, lampNoun);
-            count = 0;
-            newKeyPressed = false;
-            if (noun == nounNone) {
-                printNoun(noun);
-            }
-            else {
-                printNoun((nounOld[0] * 10) + nounOld[1]);
-            }
-        }
-        if ((keyValue == keyVerb) && (newKeyPressed)) {
-            //verb
-            mode = modeInputVerb;
-            setLamp(green, lampNoun);
-            count = 0;
-            newKeyPressed = false;
-        }
-        if ((keyValue == keyProceed) && (newKeyPressed)) {
-              mode = modeInputProgram;
-              setLamp(green, lampNoun);
-              count = 0;
-              newKeyPressed = false;
-            }
-        if ((keyValue <= keyNumber9)
-            && (count < 2)) {
-            nounNew[count] = keyValue;
-            setDigits(0, (count + 4), keyValue);
-            count++;
-            newKeyPressed = false;
-        }
-    }
+		if ((keyValue == keyEnter) && (newKeyPressed)) {
+			newKeyPressed = false;
+			nounOld[1]= noun % 10;
+			nounOld[0]= noun - nounOld[1] / 10;
+			noun = ((nounNew[0] * 10) + (nounNew[1]));
+			//if verb is change program, then anything goes...
+			if ((noun != nounIMUAttitude)
+					&& (noun != nounIdleMode)
+					&& (noun != nounIMUgyro)
+					&& (noun != nounCountUpTimer)
+					&& (noun != nounStandby)
+					&& (noun != nounClockTime)
+					&& (noun != nounLatLongAltitude)
+					&& (noun != nounRangeTgoVelocity)
+					&& (noun != nounSelectAudioclip)
+					&& (noun != nounNone)) {
+				noun = ((nounOld[0] * 10) + nounOld[1]);    // restore prior noun
+				setError(errorNoun);
+				setLamp(green, lampNoun);
+			}
+			else {
+				turnOffLampNumber(lampOprErr);
+				turnOffLampNumber(lampKeyRelease);
+				setLamp(green, lampNoun);
+				mode = modeIdle;
+				count = 0;
+				newKeyPressed = false;
+				clearAllErrors();
+				newAction = true;
+			}
+		}        }
+	if ((keyValue == keyRelease) && (newKeyPressed)) {
+		mode = modeOld;
+		turnOffLampNumber(lampKeyRelease);
+		setLamp(green, lampNoun);
+		count = 0;
+		newKeyPressed = false;
+		if (noun == nounNone) {
+			printNoun(noun);
+		}
+		else {
+			printNoun((nounOld[0] * 10) + nounOld[1]);
+		}
+	}
+	if ((keyValue == keyVerb) && (newKeyPressed)) {
+		//verb
+		mode = modeInputVerb;
+		setLamp(green, lampNoun);
+		count = 0;
+		newKeyPressed = false;
+	}
+	if ((keyValue == keyProceed) && (newKeyPressed)) {
+		mode = modeInputProgram;
+		setLamp(green, lampNoun);
+		count = 0;
+		newKeyPressed = false;
+	}
+	if ((keyValue <= keyNumber9) && (count < 2)) {
+		nounNew[count] = keyValue;
+		setDigits(0, (count + 4), keyValue);
+		count++;
+		newKeyPressed = false;
+	}
 }
+
 
 void executeNounInputMode()
 { // inputting the noun
@@ -2014,7 +2020,7 @@ void loop()
     //Now in the main area of the program. We need to check actions and modes
 
     // If nothing is happening, no action, no mode, then revert to idle
-    if ((mode == modeIdle) && (action == actionNone)) executeIdleMode();
+    if ((mode == modeIdle)) executeIdleMode();
 
     else if (mode == modeInputVerb) {
         executeVerbInputMode();
@@ -2067,7 +2073,7 @@ void loop()
     else if (action == apollo13Startup) {
         actionApollo13Startup();
     }
-    else if (action == lunarDecent) {
+    else if (action == lunarDescent) {
         printProg(64);
         playTrack(4);
         delay(1000);

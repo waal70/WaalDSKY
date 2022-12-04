@@ -12,7 +12,7 @@ enum Action: int {
     PlayAudioclip               = 7,
     PlaySelectedAudioclip       = 8,
     displayIMUGyro              = 9,
-    lunarDecent                 = 10,
+    lunarDescent                = 10,
     countUpTimer                = 11,
     idleMode                    = 12,
     pleasePerform               = 13,
