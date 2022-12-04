@@ -2,7 +2,7 @@
 #define PROGRAM_H
 
 enum Action: int {
-    none                        = 0,
+    actionNone                  = 0,
     displayIMUAttitude          = 1,
     displayRealTimeClock        = 2,
     displayGPS                  = 3,
@@ -28,6 +28,15 @@ enum Mode: int {
     modeLampTest            = 4,
     modeResetAGC            = 5,
     modeStandby             = 6
+};
+
+enum ErrorReasons: unsigned int {
+	errorNone				= 0,
+	errorVerb				= 1,
+	errorNoun				= 2,
+	errorProgam				= 4,
+	errorOther				= 8,
+	errorMaster				= 128
 };
 
 enum programNumber: int {
@@ -148,76 +157,131 @@ enum inputnumsign: int
 };
 
 
-byte verbnew[2];
-byte verbold[2];
-byte prognew[2];
-byte progold[2];
-byte nounnew[2];
-byte nounold[2];
+byte mode = modeIdle;
+byte modeOld = modeIdle;
+byte modeNew = modeIdle;
+
+byte action = actionNone;
+
+byte verb = verbNone;
+byte verbOld[2];
+byte verbNew[2];
+
+byte noun = nounNone;
+byte nounOld[2];
+byte nounNew[2];
+
+byte prog = programNone;
+byte progOld[2];
+byte progNew[2];
+
+byte count = 0;
+
+//contains the key that was pressed
+byte keyValue = keyNone;
+
+byte errorReason = errorNone;
+
+//contains the key that was pressed before
+byte oldKeyValue = keyNone;
+
 long valueForDisplay[7];
 byte digitValue[7][7];
-byte inputnum[5];
-int inputnumsign = plus;
-byte keyValue = keyNone;
-byte oldKey = keyNone;
-bool fresh = true;
-byte action = none;
-byte currentAction = none;
-byte verb = verbNone;
-byte verb_old = verbNone;
-byte verb_old2 = verbNone;
-bool verb_error = false;
-byte verbNew[2];
-byte verbOld[2];
-byte noun = nounNone;
-bool noun_error = false;
-byte noun_old = nounNone;
-byte noun_old2 = nounNone;
-byte nounNew[2];
-byte nounOld[2];
-byte currentProgram = programNone;
-byte prog = 0;
-byte prog_old = 0;
-byte prog_old2 = 0;
-bool prog_error = false;
-byte progNew[2];
-byte progOld[2];
-bool newProg = false;
-byte count = 0;
-byte mode = modeIdle;
-byte oldMode = modeIdle;
+
+bool stdByToggle = false;
+bool printregtoggle = true;
+
+//toggles for specific times: 1000msec, 600msec and 250msec
 bool toggle = false;
-bool stbyToggle = false;
 bool toggle600 = false;
 bool toggle250 = false;
 bool toggled250 = false;
-byte toggle600count = 0;
-byte toggleCount = 0;
-bool alarmStatus = false;
-bool toggle1201 = false;
-bool toggle1202 = false;
-bool error = 0;
-bool newAction = false;
-byte audioTrack = 1;
-bool blink = false;
-bool blinkverb = true;
-bool blinknoun = true;
-bool blinkprog = true;
-bool imutoggle = true;
-bool printregtoggle = true;
+
 bool uplink_compact_toggle = true;
-unsigned long blink_previousMillis = 0; 
-const long blink_interval = 600;
-int pressedDuration = 0;
-int pressedDuration2 = 0;
-int fwdVelocity = 534;
-int verticalSpeed = -724;
-int radarAltitude = 3231;
-int lat = 0;
-int lon = 0;
-int alt = 0;
+bool imutoggle = true;
+bool blink = false;
+
+bool globalError = false;
+
+// main flag to signal something has changed
+bool newAction = false;
+
+// contains whether a new key was detected
+bool newKeyPressed = false;
+
+//TODO: clear this mess
+// variable to hold on count up
 uint32_t oneSecTimer;
 uint32_t pressedTimer2;
+int pressedDuration = 0;
+int pressedDuration2 = 0;
+
+unsigned long blink_previousMillis = 0;
+unsigned long blink_interval = 600;
+
+
+//byte verbnew[2];
+//byte verbold[2];
+//byte prognew[2];
+//byte progold[2];
+//byte nounnew[2];
+//byte nounold[2];
+//byte inputnum[5];
+//int inputnumsign = plus;
+//
+//bool fresh = true;
+//byte currentAction = none;
+//byte verb = verbNone;
+//byte verb_old = verbNone;
+//byte verb_old2 = verbNone;
+//bool verb_error = false;
+//byte verbNew[2];
+//byte verbOld[2];
+//byte noun = nounNone;
+//bool noun_error = false;
+//byte noun_old = nounNone;
+//byte noun_old2 = nounNone;
+//byte nounNew[2];
+//byte nounOld[2];
+//byte currentProgram = programNone;
+//byte prog = 0;
+//byte prog_old = 0;
+//byte prog_old2 = 0;
+//bool prog_error = false;
+//byte progNew[2];
+//byte progOld[2];
+//bool newProg = false;
+//byte count = 0;
+//byte oldMode = modeIdle;
+//bool toggle = false;
+
+//bool toggle600 = false;
+//bool toggle250 = false;
+//bool toggled250 = false;
+//byte toggle600count = 0;
+//byte toggleCount = 0;
+//bool alarmStatus = false;
+//bool toggle1201 = false;
+//bool toggle1202 = false;
+//bool error = 0;
+//byte audioTrack = 1;
+//bool blink = false;
+//bool blinkverb = true;
+//bool blinknoun = true;
+//bool blinkprog = true;
+//bool imutoggle = true;
+//bool printregtoggle = true;
+//bool uplink_compact_toggle = true;
+//unsigned long blink_previousMillis = 0;
+//const long blink_interval = 600;
+
+//int fwdVelocity = 534;
+//int verticalSpeed = -724;
+//int radarAltitude = 3231;
+//int lat = 0;
+//int lon = 0;
+//int alt = 0;
+
 
 // IMU https://github.com/griegerc/arduino-gy521/blob/master/gy521-read-angle/gy521-read-angle.ino
 const int ACCEL_OFFSET   = 200;
@@ -294,7 +358,6 @@ int readKeyboard() {
     int value_row2 = analogRead(A1);
     int value_row3 = analogRead(A2);
 
-    int valueToReturn = keyNone;
     if ((value_row1 > oddRowDividerVoltage6)
         && (value_row2 > oddRowDividerVoltage6)
         && (value_row3 > oddRowDividerVoltage6))
@@ -302,34 +365,33 @@ int readKeyboard() {
         return keyNone;  // no key
     }
     // keyboard ~top row
-    else if (value_row1 < oddRowDividerVoltage1) valueToReturn= keyVerb;
-    else if (value_row1 < oddRowDividerVoltage2) valueToReturn= keyPlus;
-    else if (value_row1 < oddRowDividerVoltage3) valueToReturn= keyNumber7;
-    else if (value_row1 < oddRowDividerVoltage4) valueToReturn= keyNumber8;
-    else if (value_row1 < oddRowDividerVoltage5) valueToReturn= keyNumber9;
-    else if (value_row1 < oddRowDividerVoltage6) valueToReturn= keyClear;
+    else if (value_row1 < oddRowDividerVoltage1) return keyVerb;
+    else if (value_row1 < oddRowDividerVoltage2) return keyPlus;
+    else if (value_row1 < oddRowDividerVoltage3) return keyNumber7;
+    else if (value_row1 < oddRowDividerVoltage4) return keyNumber8;
+    else if (value_row1 < oddRowDividerVoltage5) return keyNumber9;
+    else if (value_row1 < oddRowDividerVoltage6) return keyClear;
 
     // keyboard ~middle row
-    else if (value_row2 < evenRowDividerVoltage1) valueToReturn= keyNoun;
-    else if (value_row2 < evenRowDividerVoltage2) valueToReturn= keyMinus;
-    else if (value_row2 < evenRowDividerVoltage3) valueToReturn= keyNumber4;
-    else if (value_row2 < evenRowDividerVoltage4) valueToReturn= keyNumber5;
-    else if (value_row2 < evenRowDividerVoltage5) valueToReturn= keyNumber6;
-    else if (value_row2 < evenRowDividerVoltage6) valueToReturn= keyProceed;
-    else if (value_row2 < evenRowDividerVoltage7) valueToReturn= keyEnter;
+    else if (value_row2 < evenRowDividerVoltage1) return keyNoun;
+    else if (value_row2 < evenRowDividerVoltage2) return keyMinus;
+    else if (value_row2 < evenRowDividerVoltage3) return keyNumber4;
+    else if (value_row2 < evenRowDividerVoltage4) return keyNumber5;
+    else if (value_row2 < evenRowDividerVoltage5) return keyNumber6;
+    else if (value_row2 < evenRowDividerVoltage6) return keyProceed;
+    else if (value_row2 < evenRowDividerVoltage7) return keyEnter;
 
     // keyboard ~bottom row
-    else if (value_row3 < oddRowDividerVoltage1) valueToReturn= keyNumber0;
-    else if (value_row3 < oddRowDividerVoltage2) valueToReturn= keyNumber1;
-    else if (value_row3 < oddRowDividerVoltage3) valueToReturn= keyNumber2;
-    else if (value_row3 < oddRowDividerVoltage4) valueToReturn= keyNumber3;
-    else if (value_row3 < oddRowDividerVoltage5) valueToReturn= keyRelease;
-    else if (value_row3 < oddRowDividerVoltage6) valueToReturn= keyReset;
+    else if (value_row3 < oddRowDividerVoltage1) return keyNumber0;
+    else if (value_row3 < oddRowDividerVoltage2) return keyNumber1;
+    else if (value_row3 < oddRowDividerVoltage3) return keyNumber2;
+    else if (value_row3 < oddRowDividerVoltage4) return keyNumber3;
+    else if (value_row3 < oddRowDividerVoltage5) return keyRelease;
+    else if (value_row3 < oddRowDividerVoltage6) return keyReset;
     else {
-    	valueToReturn= keyNone;
+    	return keyNone;
         // no key
     }
-    if (valueToReturn != keyNone) Serial.println(valueToReturn);
-    return valueToReturn;
+
 }
 #endif //Program.h

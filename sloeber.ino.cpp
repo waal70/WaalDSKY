@@ -2,7 +2,7 @@
 //This is a automatic generated file
 //Please do not modify this file
 //If you touch this file your change will be overwritten during the next build
-//This file has been generated on 2022-12-04 14:20:20
+//This file has been generated on 2022-12-04 18:53:55
 
 #include "Arduino.h"
 #include <Adafruit_NeoPixel.h>
@@ -26,6 +26,11 @@ void flasher() ;
 void processIdleMode() ;
 void executeIdleMode() ;
 void toggleKeyReleaseLamp() ;
+void setError (unsigned int errorType);
+void clearSpecificError (unsigned int errorType) ;
+void clearAllErrors ();
+bool isAnyError();
+bool isError (unsigned int errorType) ;
 void processVerbInputMode() ;
 void executeVerbInputMode() ;
 void processNounInputMode() ;
@@ -48,10 +53,10 @@ void flashUplinkAndComputerActivityRandomly() ;
 void readIMU(int imumode) ;
 void actionReadIMU(int imumode) ;
 void compAct();
-void lunarDecentSim();
-void startUp() ;
+void setInitialState() ;
 void actionPlaySelectedAudioclip(int clipnum) ;
 void checkClockIndic() ;
+void checkStatusLightToggles();
 void setup() ;
 void loop() ;
 

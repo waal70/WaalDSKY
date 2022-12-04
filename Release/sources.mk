@@ -48,4 +48,5 @@ libraries\SPI\src \
 libraries\TinyGPSPlus\src \
 libraries\Wire\src \
 libraries\Wire\src\utility \
+references \
 

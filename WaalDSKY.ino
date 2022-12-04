@@ -31,6 +31,8 @@ uint32_t compActivityTimer = millis();
 //forward method declarations:
 void actionApollo13Startup();
 void compAct();
+void turnOffLampNumber(int lampNumber);
+bool isError(unsigned int errorType);
 
 void lampit(byte r, byte g, byte b , int lamp) {
     neoPixels.setPixelColor(lamp, neoPixels.Color(r,g,b)); // Set it the way we like it.
@@ -42,23 +44,15 @@ void(* resetFunc) (void) = 0; //declare reset function at address 0
 
 void validateAction()
 {
-
-  //int printVal = 0b0000000100000000;
-  //printVal += (int) noun;
-  //Serial.println(printVal, BIN);
+//TODO: implement switch cases here
    if (verb == verbLampTest) {
         mode = modeLampTest;
-        //noun = noun_old;
         newAction = false;
     }
     else if (verb == verbResetAGC) {
         mode = modeResetAGC;
         newAction = false;
     }
-    //else if ((verb == verbChangeProgram) && (noun == nounIdleMode) && (noun < 1)) {
-    //    action = idleMode;
-    //    newAction = false;
-   // }
     else if ((verb == verbChangeProgram) && (noun == nounStandby)){
       //V36N06 - Change to standby
         mode = modeStandby;
@@ -116,7 +110,7 @@ void validateAction()
     }
     else {
         // not (yet) a valid verb/noun combination
-        action = none;
+        action = actionNone;
         newAction = false;
     }
 }
@@ -226,6 +220,10 @@ void setDigits(){
   } 
 }
 
+// register 0: PROG, VERB, NOUN digits
+// register 1: first row with +/- sign
+// register 2: middle row with +/- sign
+// register 3: last row with +/- sign
 void clearRegister(int dregister)
 {
     ledControl.clearDisplay(dregister);
@@ -428,93 +426,65 @@ void setDigits(byte maximum, byte digit, byte value)
 
 void flasher()
 {
-    if (verb_error == true)
-    {
-        setLamp(orange, lampVerb);
-    }
-    if (noun_error == true)
-    {
-        setLamp(orange, lampNoun);
-    }
-    if (toggle == false) {
-        setLamp(white,  lampOprErr);
-    } else {
-        setLamp(off, lampOprErr);
-    }
+   setLamp(white, lampOprErr);
+   if (isError(errorNoun)) setLamp(yellow, lampNoun);
+   if (isError(errorVerb)) setLamp(yellow, lampVerb);
 }
 
 void processIdleMode()
 {
-    if (keyValue != oldKey) {
-        fresh = true;
-        oldKey = keyValue;
+    if (keyValue != oldKeyValue) {
+        newKeyPressed = true;
+        oldKeyValue = keyValue;
     }
-    if (fresh == true) {
-        if (keyValue == keyVerb) {
-            // verb
-            mode = modeInputVerb;
-            fresh = false;
-            byte keeper = verb;
-            for (int index = 0; keeper >= 10 ; keeper = (keeper - 10)) {
-                index++;
-                verbOld[0] = index;
-            }
-            for (int index = 0; keeper >= 1; keeper = (keeper - 1)) {
-                index++;
-                verbOld[1] = index;
-            }
-        }
-        else if (keyValue == keyNoun) {
-            // noun
-            mode = modeInputNoun;
-            fresh = false;
-            byte keeper = noun;
-            for (int index = 0; keeper >= 10; keeper = (keeper - 10)) {
-                index++; nounOld[0] = index;
-            }
-            for (int index = 0;keeper >= 1; keeper = (keeper - 1)) {
-                index++; nounOld[1] = index;
-            }
-        }
-        else if (keyValue == keyProceed) {
-            // program
-              mode = modeInputProgram;
-              fresh = false;
-              byte keeper = prog;
-              for (int index = 0; keeper >= 10; keeper = (keeper - 10)) {
-                  index++; progOld[0] = index;
-              }
-              for (int index = 0;keeper >= 1; keeper = (keeper - 1)) {
-                  index++; progOld[1] = index;
-              }
-
-            }
-        else if (keyValue == keyReset) {
-            // resrt reeor
-            error = 0;
-            turnOffLampNumber(lampOprErr);
-            fresh = false;
-        }
+    if (newKeyPressed) {
+    	switch (keyValue){
+    	case keyVerb:
+    		mode = modeInputVerb;
+    		newKeyPressed=false;
+    		//Safeguard this piece of code, seems to save the old verb
+//            byte keeper = verb;
+//            for (int index = 0; keeper >= 10 ; keeper = (keeper - 10)) {
+//                index++;
+//                verbOld[0] = index;
+//            }
+//            for (int index = 0; keeper >= 1; keeper = (keeper - 1)) {
+//                index++;
+//                verbOld[1] = index;
+//            }
+    		break;
+    	case keyNoun:
+    		mode = modeInputVerb;
+    		newKeyPressed=false;
+    		break;
+    	case keyProceed:
+    		mode = modeInputProgram;
+    		newKeyPressed=false;
+    		break;
+    	case keyReset:
+    		globalError = false;
+    		newKeyPressed = false;
+    		break;
+    	 default:
+    		 //something else was pressed, we just ignore
+    		break;
+    	}
     }
 }
 
 void executeIdleMode()
-{   // no action set just reading the kb
-    if (newAction == true) {
-        validateAction();
-    }
-    else {
-        if (error == 1) {
-            flasher();
-        }
-        keyValue = readKeyboard();
-        processIdleMode();
-    }
+{   // no action set just reading the keyboard
+	if (newAction) validateAction();
+	else {
+		if (globalError) flasher();
+		keyValue = readKeyboard();
+		processIdleMode();
+	}
 }
 
 void toggleKeyReleaseLamp()
 {
-    if (toggle == false) {
+    if (!toggle) {
         setLamp(white, lampKeyRelease);
     }
     else {
@@ -522,37 +492,57 @@ void toggleKeyReleaseLamp()
     }
 }
 
+void setError (unsigned int errorType){
+	//on any error set, also set the Main Error
+	errorReason |= errorType;
+	errorReason |= errorMaster;
+}
+
+void clearSpecificError (unsigned int errorType) {
+	errorReason &= ~errorType;
+}
+
+void clearAllErrors (){
+	errorReason = errorNone;
+}
+
+bool isAnyError(){
+	if (errorReason > 0) return true;
+	else return false;
+}
+
+bool isError (unsigned int errorType) {
+	if (errorReason & errorType) return true;
+	else return false;
+}
+
 void processVerbInputMode()
 {
-    if (keyValue == oldKey) {
-        fresh = false;
+    if (keyValue == oldKeyValue) {
+        newKeyPressed = false;
     }
     else {
-        fresh = true;
-        oldKey = keyValue;
-        if ((error == 1) && (keyValue == keyReset) && (fresh == true))
+        newKeyPressed = true;
+        oldKeyValue = keyValue;
+        //this had: &&newKeyPressed is true, which seems redundant
+        if ((isError(errorMaster)) && (keyValue == keyReset))
         {
-            error = 0; 
-            verb_error = false;
-            //turnOffLampNumber(lampOprErr);
+            clearSpecificError(errorMaster);
+            clearSpecificError(errorVerb);
             setLamp(green, lampVerb);
             ledControl.setRow(0,0,0);
             ledControl.setRow(0,1,0);
-            //verb = ((verbOld[0] * 10) + verbOld[1]);
-            fresh = false;
-        } //resrt reeor
-        if ((keyValue == keyEnter) && (fresh == true)) {
-            fresh = false;
-            //das vorherige verb in verb_old speichern, mann weiss ja nie
-            verb_old2 = verb_old;
-            verb_old = verb;
+            newKeyPressed = false;
+        }
+        if ((keyValue == keyEnter) && (newKeyPressed)) {
+            newKeyPressed = false;
+            verbOld[1]= verb % 10;
+            verbOld[0]= verb - verbOld[1] / 10;
+            //verbOld = verb;
             verb = ((verbNew[0] * 10) + (verbNew[1]));
-            if (verb != verb_old)
+            if (verb != verbOld)
             {
-                // es wurde ein neues Verb eingegeben, daher muss noun auf 0 gesetzt werden
-                noun_old2 = noun_old;
-                noun_old = noun;
-                //noun = 0;
+            	noun = nounNone;
                 printNoun(noun);
             }
             // Check whether the new verb is allowed
@@ -563,8 +553,7 @@ void processVerbInputMode()
                 && (verb != verbPleasePerform)
                 && (verb != verbResetAGC)
                 && (verb != verbNone)) {
-                error = 1;
-                verb_error = true;
+                setError(errorVerb);
                 verb = ((verbOld[0] * 10) + verbOld[1]);    // restore prior verb
                 setLamp(green, lampVerb);
             }
@@ -573,56 +562,41 @@ void processVerbInputMode()
                 turnOffLampNumber(lampKeyRelease);
                 setLamp(green, lampVerb);
                 mode = modeIdle;
-                count = 0;
-                fresh = false;
-                error = 0;
-                verb_error = false;
+                clearAllErrors();
                 newAction = true;
             }
         }
-
-        if (fresh == true) {
+        // other new key than ENTER (see above)
+        if (newKeyPressed) {
             if (keyValue == keyRelease) {
-                mode = oldMode;
+                mode = modeOld;
                 turnOffLampNumber(lampKeyRelease);
-                //turnOffLampNumber(lampVerb);
                 setLamp(green, lampVerb);
-                count = 0;
-                fresh = false;
+                newKeyPressed = false;
                 if (verb == verbNone) {
-                    ledControl.setRow(0,0,0);
-                    ledControl.setRow(0,1,0);
+                    printVerb(verb);
                 }
                 else {
-                    setDigits(0, 0, verbOld[0]);
-                    setDigits(0, 1, verbOld[1]);
+                	printVerb((verbOld[0] * 10) + verbOld[1]);
                 }
             }
             else if (keyValue == keyNoun) {
                 mode = modeInputNoun;
-                //turnOffLampNumber(lampVerb);
                 setLamp(green, lampVerb);
-                count = 0;
-                fresh = false;
+                newKeyPressed = false;
             }
             else if (keyValue == keyProceed) {
-                //program
-                if((action != pleasePerform))
-                {
-                  mode = modeInputProgram;
+                   mode = modeInputProgram;
                   //turnOffLampNumber(lampVerb);
                   setLamp(green, lampVerb);
-                  count = 0;
-                  fresh = false;
-                }
+                  newKeyPressed = false;
             }
         }
-
-        if ((keyValue <= keyNumber9) && (count < 2)) {
+        if ((keyValue <= keyNumber9) && (count <= 2)) {
             verbNew[count] = keyValue;
             setDigits(0, count, keyValue);
             count++;
-            fresh = false;
+            newKeyPressed = false;
         }
     }
 }
@@ -632,33 +606,36 @@ void executeVerbInputMode()
     // inputting the verb
     setLamp(yellow, lampVerb);
     toggleKeyReleaseLamp();
-    if (error) flasher();
+    if (isAnyError()) flasher();
+
+    //we came here after having pressed VERB.
+    // read a new value off the keyboard:
     keyValue = readKeyboard();
+
     processVerbInputMode();
 }
 
 void processNounInputMode()
 {
-    if (keyValue == oldKey) {
-        fresh = false;
+    if (keyValue == oldKeyValue) {
+        newKeyPressed = false;
     }
     else {
-        fresh = true;
-        oldKey = keyValue;
-        if ((error == 1) && (keyValue == keyReset) && (fresh == true)) {
-            error = 0;
-            noun_error = false;
+        newKeyPressed = true;
+        oldKeyValue = keyValue;
+        if ((isError(errorMaster)) && (keyValue == keyReset)) {
+        	clearSpecificError(errorMaster);
+        	clearSpecificError(errorNoun);
             setLamp(green, lampNoun);
-            setLamp(off,lampOprErr);
-            fresh = false;
-        } //resrt reeor
+            turnOffLampNumber(lampOprErr);
+            newKeyPressed = false;
+        } //active error and RSET pressed
 
-        if ((keyValue == keyEnter) && (fresh == true)) {
-            fresh = false;
-            noun_old2 = noun_old;
-            noun_old = noun;
+        if ((keyValue == keyEnter) && (newKeyPressed)) {
+            newKeyPressed = false;
+            nounOld[1]= noun % 10;
+            nounOld[0]= noun - nounOld[1] / 10;
             noun = ((nounNew[0] * 10) + (nounNew[1]));
-            fresh = false;
             if ((noun != nounIMUAttitude)
                 && (noun != nounIdleMode)
                 && (noun != nounIMUgyro)
@@ -670,8 +647,7 @@ void processNounInputMode()
                 && (noun != nounSelectAudioclip)
                 && (noun != nounNone)) {
                 noun = ((nounOld[0] * 10) + nounOld[1]);    // restore prior noun
-                error = 1;
-                noun_error = true;
+                setError(errorNoun);
                 setLamp(green, lampNoun);
             }
             else {
@@ -680,80 +656,63 @@ void processNounInputMode()
                 setLamp(green, lampNoun);
                 mode = modeIdle;
                 count = 0;
-                fresh = false;
-                error = 0;
-                noun_error = false;
+                newKeyPressed = false;
+                clearAllErrors();
                 newAction = true;
             }
         }
-
-        if ((keyValue == keyRelease) && (fresh == true)) {
-            mode = oldMode;
+        if ((keyValue == keyRelease) && (newKeyPressed)) {
+            mode = modeOld;
             turnOffLampNumber(lampKeyRelease);
             setLamp(green, lampNoun);
             count = 0;
-            fresh = false;
-            if (noun == 0) {
-                //verb
+            newKeyPressed = false;
+            if (noun == nounNone) {
                 printNoun(noun);
-                //ledControl.setRow(0, 4, 0);
-                //ledControl.setRow(0, 5, 0);
             }
             else {
-                printNoun(noun);
-                //setDigits(0, 4, nounOld[0]);
-                //setDigits(0, 5, nounOld[1]);
+                printNoun((nounOld[0] * 10) + nounOld[1]);
             }
         }
-        if ((keyValue == keyVerb) && (fresh == true)) {
+        if ((keyValue == keyVerb) && (newKeyPressed)) {
             //verb
             mode = modeInputVerb;
             setLamp(green, lampNoun);
             count = 0;
-            fresh = false;
+            newKeyPressed = false;
         }
-        if ((keyValue == keyProceed) && (fresh == true)) {
-            if(action != pleasePerform)
-            {
+        if ((keyValue == keyProceed) && (newKeyPressed)) {
               mode = modeInputProgram;
               setLamp(green, lampNoun);
               count = 0;
-              fresh = false;
-              //program
+              newKeyPressed = false;
             }
-        }
         if ((keyValue <= keyNumber9)
             && (count < 2)) {
             nounNew[count] = keyValue;
             setDigits(0, (count + 4), keyValue);
             count++;
-
+            newKeyPressed = false;
         }
     }
 }
 
 void executeNounInputMode()
 { // inputting the noun
-    //Serial.println("Begin exexuteNounInputMode");
     setLamp(yellow, lampNoun);
     toggleKeyReleaseLamp();
-    if (error == 1) {
-        flasher();
-    }
+    if (isAnyError()) flasher();
     keyValue = readKeyboard();
-    //Serial.println("End exexuteNounInputMode");
     processNounInputMode();
 }
 
 
 void executeProgramInputMode()
 {
-	if (error) Serial.println("error condition");
-    setLamp(blue, lampProg);
+	//setting to blue because this neopixels errors out on yellow.
+	setLamp(blue, lampProg);
     toggleKeyReleaseLamp();
-    if (error == 1) {
-        flasher();
-    }
+    if (isAnyError()) flasher();
     keyValue = readKeyboard();
     processProgramInputMode();
 }
@@ -761,25 +720,27 @@ void executeProgramInputMode()
 void processProgramInputMode() {
 
 	//Andre: re-try for program input mode, based on verb input mode
-	if (keyValue == oldKey) {
-	        fresh = false;
+	if (keyValue == oldKeyValue) {
+	        newKeyPressed = false;
 	    }
 	    else {
-	        fresh = true;
-	        oldKey = keyValue;
-	        if ((error == 1) && (keyValue == keyReset) && (fresh == true)) {
-	            error = 0;
-	            prog_error = false;
+	        newKeyPressed = true;
+	        oldKeyValue = keyValue;
+	        if ((isError(errorMaster)) && (keyValue == keyReset)) {
+	        	clearSpecificError(errorMaster);
+	        	clearSpecificError(errorProgam);
 	            setLamp(green, lampProg);
-	            setLamp(off,lampOprErr);
-	            fresh = false;
+	            turnOffLampNumber(lampOprErr);
+	            newKeyPressed = false;
 	        } //resrt reeor
 
-	        if ((keyValue == keyEnter) && (fresh == true)) {
-	            fresh = false;
-	            prog_old = prog;
+	        if ((keyValue == keyEnter) && (newKeyPressed)) {
+	            newKeyPressed = false;
+	            //progOld = prog;
+	            progOld[1]= prog % 10;
+	            progOld[0]= prog - progOld[1] / 10;
 	            prog = ((progNew[0] * 10) + (progNew[1]));
-	            fresh = false;
+	            newKeyPressed = false;
 	            if ((prog != 16)
 	                  && (prog != 21)
 	                  && (prog != 35)
@@ -788,9 +749,7 @@ void processProgramInputMode() {
 	                  && (prog != programApollo13Audio)
 	                  && (prog != programNone)) {
 	            	// none of the values correspond to a valid program.
-	            	  prog_error = true;
-	            	  error = true;
-	            	  //prog = ((progOld[0] * 10) + progOld[1]); //restore prior prog
+	            	  setError(errorProgam);
 	            	  setLamp(green, lampProg);
 	            }
 	            else {
@@ -798,33 +757,31 @@ void processProgramInputMode() {
 	                turnOffLampNumber(lampOprErr);
 	                turnOffLampNumber(lampKeyRelease);
 	                setLamp(green, lampProg);
-	                currentProgram = prog;
 	                mode = modeIdle;
 	                count = 0;
-	                fresh = false;
-	                error = false;
-	                prog_error = false;
+	                newKeyPressed = false;
+	                clearAllErrors();
 	                newAction = true;
 	            }
 	        }
-	        if (keyValue != oldKey) {
-	                fresh = true;
-	                oldKey = keyValue;
+	        if (keyValue != oldKeyValue) {
+	                newKeyPressed = true;
+	                oldKeyValue = keyValue;
 	            }
 
-	        if ((keyValue == keyRelease) && (fresh == true)) {
-	            mode = oldMode;
+	        if ((keyValue == keyRelease) && (newKeyPressed)) {
+	            mode = modeOld;
 	            turnOffLampNumber(lampKeyRelease);
 	            setLamp(green, lampProg);
 	            count = 0;
-	            fresh = false;
+	            newKeyPressed = false;
 	        }
-	        if ((keyValue == keyVerb) && (fresh == true)) {
+	        if ((keyValue == keyVerb) && (newKeyPressed)) {
 	            //verb
 	            mode = modeInputVerb;
 	            setLamp(green, lampNoun);
 	            count = 0;
-	            fresh = false;
+	            newKeyPressed = false;
 	        }
 	        if ((keyValue <= keyNumber9) && (count < 2)) {
 	            progNew[count] = keyValue;
@@ -853,8 +810,8 @@ void executeLampTestModeWithDuration(int durationInMilliseconds)
     }
   }
   delay(1500);
-  verb = verb_old;
-  noun = noun_old;
+  verb = verbOld;
+  noun = nounOld;
   for (int index = 0; index < 4; index++) 
   {
     //Off
@@ -896,12 +853,6 @@ void executeLampTestModeWithDuration(int durationInMilliseconds)
     ledControl.clearDisplay(1);
     ledControl.clearDisplay(2);
     ledControl.clearDisplay(3);
-  if (verb == 0) {ledControl.setRow(0,0,0);ledControl.setRow(0,1,0);}
-  else{setDigits(0, 0,verbold[0]);setDigits(0, 1,verbold[1]);}
-  if (prog == 0) {ledControl.setRow(0,2,0);ledControl.setRow(0,3,0);}
-  else{setDigits(0, 0,prognew[0]);setDigits(0, 1,prognew[1]);}
-   if (noun == 0) {ledControl.setRow(0,4,0);ledControl.setRow(0,5,0);}
-  else{setDigits(0, 4,nounnew[0]);setDigits(0, 5,nounnew[1]);}
     delay(1000); 
     setLamp(green, lampVerb);
     setLamp(green, lampNoun);
@@ -976,7 +927,7 @@ void startupsequence(int durationInMilliseconds)
 void actionPleasePerform()
 {
   keyValue = readKeyboard();
-  if(!stbyToggle)
+  if(!stdByToggle)
   {
     setLamp(green, lampCompActy);
     setLamp(white, lampSTBY);
@@ -1003,9 +954,9 @@ void actionPleasePerform()
     }
   }
 
-  while (keyValue == keyProceed && !stbyToggle)
+  while (keyValue == keyProceed && !stdByToggle)
   {
-    if(!stbyToggle)
+    if(!stdByToggle)
     {
       if (flashTimer > millis())  flashTimer = millis();
       if (millis() - flashTimer >= 500 && millis() - flashTimer < 1000) 
@@ -1033,20 +984,20 @@ void actionPleasePerform()
         setLamp(off, lampCompActy);
         for (int index = 0; index < 4; index++) {ledControl.clearDisplay(index); }
         delay(300);
-        stbyToggle = 1;
+        stdByToggle = 1;
         keyValue = 0;
         delay(1500);
       }   
     }
   }
     
-  if(stbyToggle == 1)
+  if(stdByToggle == 1)
   {
     setLamp(white, lampSTBY);
     setLamp(off, lampCompActy);
   }
   
-  while (keyValue == keyProceed && stbyToggle == 1)
+  while (keyValue == keyProceed && stdByToggle == 1)
   {
     if (pressedTimer2 > millis())  pressedTimer2 = millis();
     if (millis() - pressedTimer2 >= 1000) 
@@ -1056,7 +1007,7 @@ void actionPleasePerform()
     }
     if(pressedDuration2 > 1)
     {
-      stbyToggle = 0;
+      stdByToggle = 0;
       keyValue = 0;
       verb = 16;
       verb = 20;
@@ -1128,7 +1079,7 @@ void actionApollo13Startup()
 //  playTrack(5);
   setLamp(green, lampCompActy);
   delay(500);
-  stbyToggle = 0;
+  stdByToggle = false;
   setLamp(off, lampSTBY);
   printProg(prog);
   printVerb(verb);
@@ -1146,8 +1097,8 @@ void actionApollo13Startup()
   printProg(prog);
   printNoun(noun);
   printVerb(verb);
-  pressedDuration = 0;
-  pressedDuration2 = 0;
+  //pressedDuration = 0;
+ // pressedDuration2 = 0;
   action = displayRealTimeClock;
   validateAction();
 }
@@ -1315,8 +1266,8 @@ void actionSetTime()
 
     while (keyValue != keyEnter) {
         keyValue = readKeyboard();
-        if (keyValue != oldKey) {
-            oldKey = keyValue;
+        if (keyValue != oldKeyValue) {
+            oldKeyValue = keyValue;
             if (keyValue == keyPlus) {
                 nowHour++;
             }
@@ -1341,8 +1292,8 @@ void actionSetTime()
 
     while (keyValue != keyEnter) {
         keyValue = readKeyboard();
-        if (keyValue != oldKey) {
-            oldKey = keyValue;
+        if (keyValue != oldKeyValue) {
+            oldKeyValue = keyValue;
             if (keyValue == keyPlus) {
                 nowMinute++;
             }
@@ -1367,8 +1318,8 @@ void actionSetTime()
 
     while (keyValue != keyEnter) {
         keyValue = readKeyboard();
-        if (keyValue != oldKey) {
-            oldKey = keyValue;
+        if (keyValue != oldKeyValue) {
+            oldKeyValue = keyValue;
             if (keyValue == keyPlus) {
                 nowSecond++;
             }
@@ -1450,9 +1401,9 @@ void actionSelectAudioclip()
             printNoun(noun, blink);
         }
         keyValue = readKeyboard();
-        if (keyValue != oldKey)
+        if (keyValue != oldKeyValue)
         {
-            oldKey = keyValue;
+            oldKeyValue = keyValue;
             if (keyValue == keyPlus) {
                 clipnum++;
             }
@@ -1608,355 +1559,366 @@ void compAct(){
  else {lampit(0,0,0,17);}
 }
 
-void lunarDecentSim(){
-  
-  digitalWrite(5, LOW);
-  setLamp(off, lampNoAtt);
-  int totalSeconds = 260;
-  uint32_t timer2 = millis();
-  uint32_t alarmTimer = millis();
-  uint32_t descentStart = millis();
-  descentCounter = (millis() - descentStart)/1000;
-  toggle = 0;
-  toggle1201 = false;
-  toggle1202 = 0;
-  alarmStatus = 0;
-  while(descentCounter < totalSeconds){ //
-    descentCounter = (millis() - descentStart)/1000;
- 
- ///============1201 issue
-    if(toggle1201)
-    {
-      alarmStatus = 1;
-      toggle1201 = 0;
-      printRegister(1,1201,false);
-      printRegister(2,1201,false);
-    }
-    
-    if(toggle1202)
-    {
-      alarmStatus = 1;
-      toggle1202 = 0;
-      printRegister(1,1202,false);
-      printRegister(2,1202,false);
-     } 
+//void lunarDecentSim(){
+//
+//  digitalWrite(5, LOW);
+//  setLamp(off, lampNoAtt);
+//  int totalSeconds = 260;
+//  uint32_t timer2 = millis();
+//  uint32_t alarmTimer = millis();
+//  uint32_t descentStart = millis();
+//  descentCounter = (millis() - descentStart)/1000;
+//  toggle = 0;
+//  toggle1201 = false;
+//  toggle1202 = 0;
+//  alarmStatus = 0;
+//  while(descentCounter < totalSeconds){ //
+//    descentCounter = (millis() - descentStart)/1000;
+//
+// ///============1201 issue
+//    if(toggle1201)
+//    {
+//      alarmStatus = 1;
+//      toggle1201 = 0;
+//      printRegister(1,1201,false);
+//      printRegister(2,1201,false);
+//    }
+//
+//    if(toggle1202)
+//    {
+//      alarmStatus = 1;
+//      toggle1202 = 0;
+//      printRegister(1,1202,false);
+//      printRegister(2,1202,false);
+//     }
+//
+//    if(descentCounter == 8)
+//    {
+//      radarAltitude = 3000;
+//    }
+//
+//    if (descentCounter == 18)
+//      {
+//      alarmStatus = 0;
+//      toggle = 0;
+//      toggle1201 = 0;
+//      setLamp(off, lampRestart);
+//      alarmTimer = millis(); // reset the timer
+//      }
+//
+//    if(descentCounter == 24)
+//    {
+//      radarAltitude = 2000;
+//    }
+//
+//    if(descentCounter == 59)
+//    {
+//      radarAltitude = 700;
+//      verticalSpeed = -100;
+//    }
+//
+//    if(descentCounter == 69)
+//    {
+//      radarAltitude = 540;
+//      verticalSpeed = -300;
+//    }
+//
+//    if(descentCounter == 78)
+//    {
+//      fwdVelocity = 40;
+//      radarAltitude = 400;
+//      verticalSpeed = -90;
+//    }
+//
+//    if(descentCounter == 140)
+//    {
+//      radarAltitude = 250;
+//      verticalSpeed = -40;
+//    }
+//
+//    if(descentCounter == 160)
+//    {
+//      radarAltitude = 200;
+//      verticalSpeed = -35;
+//    }
+//
+//    if(descentCounter == 170)
+//    {
+//      radarAltitude = 100;
+//      verticalSpeed = -15;
+//    }
+//
+//     if(descentCounter == 180)
+//    {
+//      radarAltitude = 70;
+//      verticalSpeed = -10;
+//    }
+//
+//     if(descentCounter == 190)
+//    {
+//      fwdVelocity = 19;
+//      radarAltitude = 50;
+//      verticalSpeed = -25;
+//    }
+//
+//   if(descentCounter == 200)
+//    {
+//      fwdVelocity = 6;
+//      radarAltitude = 20;
+//      verticalSpeed = -10;
+//    }
+//
+//    if(descentCounter == 220)
+//    {
+//      fwdVelocity = 14;
+//      radarAltitude = 10;
+//      verticalSpeed = -4;
+//    }
+//
+//
+//  /////////////////////////
+//  //     1201 Alarm     //
+//  ///////////////////////
+//    if(descentCounter > 8 && descentCounter < 18)
+//      {
+//       toggle = 1;
+//       if(descentCounter < 10)
+//       {
+//        clearRegister(1);
+//        clearRegister(2);
+//        clearRegister(3);
+//       }
+//       if(descentCounter > 10 && !alarmStatus)
+//       {
+//        toggle1201 = 1;
+//       }
+//      if (alarmTimer > millis())  alarmTimer = millis();
+//      if (millis() - alarmTimer >= 500 && millis() - alarmTimer < 1000)
+//      {
+//        setLamp(yellow, lampRestart);
+//      }
+//      if (millis() - alarmTimer >= 1000) {
+//        setLamp(off, lampRestart);
+//        alarmTimer = millis(); // reset the timer
+//      }
+//  }
+//
+//  /////////////////////////
+//  //       END 1201     //
+//  ///////////////////////
+//
+//   ////////////////////////
+//  //     1202 Alarm     //
+//  ///////////////////////
+//      if(descentCounter > 43 && descentCounter < 48){
+//       toggle = 1;
+//       if(descentCounter < 45)
+//       {
+//        clearRegister(1);
+//        clearRegister(2);
+//        clearRegister(3);
+//       }
+//       if(descentCounter > 44 && !alarmStatus)
+//       {
+//        toggle1202 = 1;
+//       }
+//      if (alarmTimer > millis())  alarmTimer = millis();
+//      if (millis() - alarmTimer >= 500 && millis() - alarmTimer < 1000)
+//      {
+//        setLamp(yellow, lampRestart);
+//      }
+//      if (millis() - alarmTimer >= 1000) {
+//        setLamp(off, lampRestart);
+//        alarmTimer = millis(); // reset the timer
+//      }
+//  }
+//  if (descentCounter == 50)
+//  {
+//    toggle = 0;
+//    toggle1202 = 0;
+//    setLamp(off, lampRestart);
+//    alarmTimer = millis(); // reset the timer
+//  }
+//  /////////////////////////
+//  //       END 1202     //
+//  ///////////////////////
+//
+//
+//  /////////////////////////
+//  //     PROGRAM 65     //
+//  ///////////////////////
+//  if (descentCounter > 75 && descentCounter <= 82)
+//  {
+//    printProg(65);
+//    if(descentCounter > 75 && descentCounter <= 80)
+//    {
+//    printVerb(06);
+//    printNoun(60);
+//    if (alarmTimer > millis())  alarmTimer = millis();
+//      if (millis() - alarmTimer >= 500 && millis() - alarmTimer < 1000)
+//      {
+//        ledControl.setIntensity(0, 3);
+//      }
+//      if (millis() - alarmTimer >= 1000) {
+//        ledControl.setIntensity(0, 15);
+//        alarmTimer = millis(); // reset the timer
+//      }
+//    }
+//  }
+//
+//  if (descentCounter > 80 && descentCounter <= 92)
+//  {
+//      printNoun(68);
+//      printVerb(16);
+//      ledControl.setIntensity(0, 15);
+//  }
+//  /////////////////////////
+//  //     PROGRAM 66     //
+//  ///////////////////////
+//  if (descentCounter > 92 && descentCounter <= 99)
+//  {
+//    printProg(66);
+//    if(descentCounter > 75 && descentCounter <= 98)
+//    {
+//    if (alarmTimer > millis())  alarmTimer = millis();
+//      if (millis() - alarmTimer >= 500 && millis() - alarmTimer < 1000)
+//      {
+//        ledControl.setIntensity(0, 3);
+//      }
+//      if (millis() - alarmTimer >= 1000) {
+//        ledControl.setIntensity(0, 15);
+//        alarmTimer = millis(); // reset the timer
+//      }
+//    }
+//    if (descentCounter > 98)
+//    {
+//      ledControl.setIntensity(0, 15);
+//    }
+//  }
+//   ////////////////////////
+//  //  ALT & VEL LIGHTS  //
+// ////////////////////////
+//      if(descentCounter >= 134 && descentCounter < 199){
+//        setLamp(yellow, lampAlt);
+//        setLamp(yellow, lampVel);
+//      }
+//  /////////////////////////
+//  //   END ALT & VEL    //
+// ////////////////////////
+//      if(!toggle && !toggle1201 && !toggle1202 && descentCounter < 256)
+//      {
+//        setLamp(off, lampProgCond);
+//        if (timer2 > millis())  timer2 = millis();
+//        if (millis() - timer2 >= 300 && toggle == 0) {
+//        int randNumb = random(0, 3);
+//        fwdVelocity = fwdVelocity - randNumb;
+//        verticalSpeed = verticalSpeed + randNumb;
+//        radarAltitude = radarAltitude - randNumb;
+//
+//         if (fwdVelocity < 0) fwdVelocity = 0;
+//         if (radarAltitude < 0) radarAltitude = 0;
+//         if (verticalSpeed > 0) verticalSpeed = 0;
+//
+//         if(descentCounter > 225)
+//         {
+//          fwdVelocity = 0;
+//          verticalSpeed = 0;
+//          radarAltitude = 0;
+//         }
+//          printRegister(1, fwdVelocity);
+//          printRegister(2, verticalSpeed);
+//          printRegister(3, radarAltitude);
+//          timer2 = millis(); // reset the timer
+//        }
+//      }
+//      if(toggle == 0 && descentCounter > 225)
+//      {
+//        setLamp(off, lampAlt);
+//        setLamp(off, lampVel);
+//      }
+//      if(toggle == 0 && descentCounter > 226)
+//      {
+//        setLamp(white, lampNoAtt);
+//        setLamp(off, lampVel);
+//      }
+//
+//      if (activityTimer > millis())  activityTimer = millis();
+//      //if (millis() - activityTimer >= 1000) {
+//      //    descentCounter++;
+//      //    activityTimer = millis(); // reset the timer
+//      //}
+//      if (compActivityTimer > millis())  compActivityTimer = millis();
+//      if (millis() - compActivityTimer >= 200) {
+//          compActivityTimer = millis(); // reset the timer
+//          if(!toggle)
+//          {
+//            compAct();
+//          }
+//      }
+//      if(toggle == 0 && descentCounter >= 248)
+//      {
+//        digitalWrite(5, LOW);
+//        setLamp(off, lampUplinkActy);
+//        setLamp(off, lampCompActy);
+//        printProg(00);
+//        printVerb(16);
+//        printNoun(36);
+//        action = displayRealTimeClock;
+//        actionReadTime();
+//      }
+//    }
+// }
 
-    if(descentCounter == 8)
-    {
-      radarAltitude = 3000;  
-    }
 
-    if (descentCounter == 18)
-      {
-      alarmStatus = 0;
-      toggle = 0;
-      toggle1201 = 0;
-      setLamp(off, lampRestart);
-      alarmTimer = millis(); // reset the timer
-      }
+void setInitialState() {
+	//Turn first four lamps off, then green
+	for (int index = 0; index < 4; index++) {
+		turnOffLampNumber(index);
+		delay(200);
+		setLamp(green, index);
+	}
+	//Turn next 14 lamps to their respective color
+	for (int index = 4; index < 18; index++) {
+		//first 7 lamps are yellow - light it from top to bottom
+		if(index < 11) setLamp(yellow, index);
+		// next 7 lamps are white.
+		// in order to light from top to bottom, we need to reverse
+		// index + lampNumber is 28, so use this
+		if(index >= 11) setLamp(white, 28 - index);
+		delay(50);
+	}
+	//Then, set all 4 rows of digits to 8.
+	// The first row (index = 0) is the prog verb noun row
+	for (int index = 0; index < 4; index++) {
+		for (int indexb = 0; indexb < 6; indexb++) {
+			setDigits(index,indexb,8);
+			delay(25);
+		}
+	}
+	delay(1000);
+	// Now, turn off all lamps, except prog verb noun (0, 1, 2)
+	for (int index = 3; index < 18; index++) {
+		// also keep on NO ATT lamp
+		if (index != lampNoAtt) turnOffLampNumber(index);
+	}
 
-    if(descentCounter == 24)
-    {
-      radarAltitude = 2000;  
-    }
+	// Then, clear all digit rows
+	for (int index = 0; index < 4; index++) clearRegister(index);
 
-    if(descentCounter == 59)
-    {
-      radarAltitude = 700;
-      verticalSpeed = -100;  
-    }
-
-    if(descentCounter == 69)
-    {
-      radarAltitude = 540; 
-      verticalSpeed = -300;  
-    }
-
-    if(descentCounter == 78)
-    {
-      fwdVelocity = 40;
-      radarAltitude = 400; 
-      verticalSpeed = -90;  
-    }
-    
-    if(descentCounter == 140)
-    {
-      radarAltitude = 250; 
-      verticalSpeed = -40;  
-    }    
-    
-    if(descentCounter == 160)
-    {
-      radarAltitude = 200; 
-      verticalSpeed = -35;  
-    }
-
-    if(descentCounter == 170)
-    {
-      radarAltitude = 100; 
-      verticalSpeed = -15;  
-    }
-
-     if(descentCounter == 180)
-    {
-      radarAltitude = 70; 
-      verticalSpeed = -10;  
-    }
-
-     if(descentCounter == 190)
-    {
-      fwdVelocity = 19;
-      radarAltitude = 50; 
-      verticalSpeed = -25;  
-    }
-
-   if(descentCounter == 200)
-    {
-      fwdVelocity = 6;
-      radarAltitude = 20; 
-      verticalSpeed = -10;  
-    }
-
-    if(descentCounter == 220)
-    {
-      fwdVelocity = 14;
-      radarAltitude = 10; 
-      verticalSpeed = -4;  
-    }
-
-    
-  /////////////////////////
-  //     1201 Alarm     //
-  /////////////////////// 
-    if(descentCounter > 8 && descentCounter < 18)
-      {       
-       toggle = 1;
-       if(descentCounter < 10)
-       {
-        clearRegister(1);
-        clearRegister(2);
-        clearRegister(3);
-       }
-       if(descentCounter > 10 && !alarmStatus)
-       {
-        toggle1201 = 1;
-       }       
-      if (alarmTimer > millis())  alarmTimer = millis();
-      if (millis() - alarmTimer >= 500 && millis() - alarmTimer < 1000) 
-      {
-        setLamp(yellow, lampRestart);
-      }
-      if (millis() - alarmTimer >= 1000) {
-        setLamp(off, lampRestart);
-        alarmTimer = millis(); // reset the timer
-      }
-  }
-    
-  /////////////////////////
-  //       END 1201     //
-  ///////////////////////   
-
-   ////////////////////////
-  //     1202 Alarm     //
-  /////////////////////// 
-      if(descentCounter > 43 && descentCounter < 48){
-       toggle = 1;
-       if(descentCounter < 45)
-       {
-        clearRegister(1);
-        clearRegister(2);
-        clearRegister(3); 
-       }
-       if(descentCounter > 44 && !alarmStatus)
-       {
-        toggle1202 = 1;
-       }
-      if (alarmTimer > millis())  alarmTimer = millis();
-      if (millis() - alarmTimer >= 500 && millis() - alarmTimer < 1000) 
-      {
-        setLamp(yellow, lampRestart);
-      }
-      if (millis() - alarmTimer >= 1000) {
-        setLamp(off, lampRestart);
-        alarmTimer = millis(); // reset the timer
-      }     
-  }
-  if (descentCounter == 50)
-  {
-    toggle = 0;
-    toggle1202 = 0;
-    setLamp(off, lampRestart);
-    alarmTimer = millis(); // reset the timer
-  }    
-  /////////////////////////
-  //       END 1202     //
-  ///////////////////////   
-
-
-  /////////////////////////
-  //     PROGRAM 65     //
-  /////////////////////// 
-  if (descentCounter > 75 && descentCounter <= 82) 
-  {
-    printProg(65);
-    if(descentCounter > 75 && descentCounter <= 80)
-    {
-    printVerb(06);
-    printNoun(60);
-    if (alarmTimer > millis())  alarmTimer = millis();
-      if (millis() - alarmTimer >= 500 && millis() - alarmTimer < 1000) 
-      {
-        ledControl.setIntensity(0, 3);
-      }
-      if (millis() - alarmTimer >= 1000) {
-        ledControl.setIntensity(0, 15);
-        alarmTimer = millis(); // reset the timer
-      }
-    }     
-  }
-
-  if (descentCounter > 80 && descentCounter <= 92)
-  {
-      printNoun(68);
-      printVerb(16);
-      ledControl.setIntensity(0, 15);
-  }
-  /////////////////////////
-  //     PROGRAM 66     //
-  /////////////////////// 
-  if (descentCounter > 92 && descentCounter <= 99) 
-  {
-    printProg(66);
-    if(descentCounter > 75 && descentCounter <= 98)
-    {
-    if (alarmTimer > millis())  alarmTimer = millis();
-      if (millis() - alarmTimer >= 500 && millis() - alarmTimer < 1000) 
-      {
-        ledControl.setIntensity(0, 3);
-      }
-      if (millis() - alarmTimer >= 1000) {
-        ledControl.setIntensity(0, 15);
-        alarmTimer = millis(); // reset the timer
-      }
-    }
-    if (descentCounter > 98)
-    {
-      ledControl.setIntensity(0, 15);
-    }     
-  }
-   ////////////////////////
-  //  ALT & VEL LIGHTS  //
- //////////////////////// 
-      if(descentCounter >= 134 && descentCounter < 199){
-        setLamp(yellow, lampAlt);
-        setLamp(yellow, lampVel);
-      }
-  /////////////////////////
-  //   END ALT & VEL    //
- ////////////////////////   
-      if(!toggle && !toggle1201 && !toggle1202 && descentCounter < 256)
-      {
-        setLamp(off, lampProgCond);
-        if (timer2 > millis())  timer2 = millis();
-        if (millis() - timer2 >= 300 && toggle == 0) {
-        int randNumb = random(0, 3);
-        fwdVelocity = fwdVelocity - randNumb;
-        verticalSpeed = verticalSpeed + randNumb;
-        radarAltitude = radarAltitude - randNumb;
-         
-         if (fwdVelocity < 0) fwdVelocity = 0; 
-         if (radarAltitude < 0) radarAltitude = 0; 
-         if (verticalSpeed > 0) verticalSpeed = 0;
-
-         if(descentCounter > 225) 
-         {
-          fwdVelocity = 0; 
-          verticalSpeed = 0; 
-          radarAltitude = 0; 
-         }
-          printRegister(1, fwdVelocity);
-          printRegister(2, verticalSpeed);
-          printRegister(3, radarAltitude);
-          timer2 = millis(); // reset the timer
-        }
-      }
-      if(toggle == 0 && descentCounter > 225)
-      {
-        setLamp(off, lampAlt);
-        setLamp(off, lampVel);
-      }
-      if(toggle == 0 && descentCounter > 226)
-      {
-        setLamp(white, lampNoAtt);
-        setLamp(off, lampVel);
-      }
-      
-      if (activityTimer > millis())  activityTimer = millis();
-      //if (millis() - activityTimer >= 1000) {
-      //    descentCounter++;
-      //    activityTimer = millis(); // reset the timer
-      //}
-      if (compActivityTimer > millis())  compActivityTimer = millis();
-      if (millis() - compActivityTimer >= 200) {
-          compActivityTimer = millis(); // reset the timer
-          if(!toggle)
-          {
-            compAct();
-          }
-      }
-      if(toggle == 0 && descentCounter >= 248)
-      {
-        digitalWrite(5, LOW);
-        setLamp(off, lampUplinkActy);
-        setLamp(off, lampCompActy);
-        printProg(00);
-        printVerb(16);
-        printNoun(36);
-        action = displayRealTimeClock;
-        actionReadTime();
-      }
-    }
- }
-
-
-void startUp() {
-  for (int index = 0; index < 4; index++){lampit(0,0,0, index);delay(200);lampit(0,150,0, index);}
-  for (int index = 4; index < 18; index++) {
-    if(index < 11){lampit(100,100,0, index);}
-    if(index <= 12){lampit(100,100,100, 23-index);}
-    delay(50);
-  }
-//for (int index = 11; index < 18; index++) {lampit(100,100,100, index);delay(50);}
-  for (int index = 0; index < 4; index++) {
-    for (int indexb = 0; indexb < 6; indexb++){
-      setDigits(index,indexb,8);
-      delay(25);
-    }
-  }
-  delay(1000); 
-  for (int index = 3; index < 11; index++) {lampit(0,0,0, index);}
-  for (int index = 11; index < 18; index++) {if(index != 16){lampit(0,0,0, index);}}
-  for (int index = 0; index < 4; index++) {ledControl.clearDisplay(index); }
-  verbnew[0] = verbold[0]; verbnew[1] = verbold[1];
-  verb = ((verbold[0] * 10) + verbold[1]);
-  if (verb == 0) {ledControl.setRow(0,0,0);ledControl.setRow(0,1,0);}
-  else{setDigits(0, 0,verbold[0]);setDigits(0, 1,verbold[1]);}
-  if (prog == 0) {ledControl.setRow(0,2,0);ledControl.setRow(0,3,0);}
-  else{setDigits(0, 0,prognew[0]);setDigits(0, 1,prognew[1]);}
-   if (noun == 0) {ledControl.setRow(0,4,0);ledControl.setRow(0,5,0);}
-  else{setDigits(0, 4,nounnew[0]);setDigits(0, 5,nounnew[1]);}
-  
-  keyValue = 20;
-  mode = 0;
-  validateAction(); 
-  }
+	//erase any keyboard input
+	keyValue = keyNone;
+	//set mode to idle
+	mode = modeIdle;
+	//go
+	validateAction();
+}
   // V16 N98 play the selected Audio Clip
 void actionPlaySelectedAudioclip(int clipnum)
 {   // V16 N98 play the selected Audio Clip
     printVerb(verb);
     printNoun(noun);
     playTrack(clipnum);
-    action = none;
+    action = actionNone;
     verb = verbNone;
     noun = nounNone;
     prog = programNone;
@@ -1997,6 +1959,13 @@ void checkClockIndic()
 
 }
 
+void checkStatusLightToggles(){
+
+	if (stdByToggle) setLamp(white, lampSTBY);
+	if (!stdByToggle) turnOffLampNumber(lampSTBY);
+}
+
+
 void setup()
 {
     pinMode(A0, INPUT);
@@ -2029,25 +1998,10 @@ void setup()
     
   Serial.begin(9600);
   soundSetup(); //initialize the MP3-player
-  //Light up PRO, NOUN, VERB and NO ATT
-  startUp(); 
-  while (!Serial); //in case we're connected via USB, wait until Serial becomes available;
-    delay(100);
-    clearRegister(1);
-    delay(100);
-    clearRegister(2);
-    delay(100);
-    clearRegister(3);
+  //Light up PRO, NOUN, VERB and NO ATT, clear everything else
+  setInitialState();
 
-    delay(100);
-    setLamp(green, lampNoun);
-    delay(100);
-    setLamp(green, lampVerb);
-    delay(100);
-    setLamp(green, lampProg);
-    delay(100);
-    setLamp(white, lampNoAtt);
-    //action = displayGPS; // here you can default to a certain mode
+  while (!Serial); //in case we're connected via USB, wait until Serial becomes available;
 }
 
 void loop()
@@ -2055,52 +2009,13 @@ void loop()
     timer.tick(); // toggle on / off
     checkClockIndic(); // checks whether to display the clock pixel
 
-    if (currentProgram == programJFKAudio) {
-        playTrack(JFK);
-        currentProgram = programNone;
-        action = none;
-        verb = verbNone;
-        noun = nounNone;
-        prog = programNone;
-        printVerb(verb);
-        printNoun(noun);
-        printProg(prog);
-        clearRegister(1);
-        clearRegister(2);
-        clearRegister(3);
-    }
-    else if (currentProgram == programApollo11Audio) {
-        playTrack(GO_LANDING);
-        currentProgram = programNone;
-        action = none;
-        verb = verbNone;
-        noun = nounNone;
-        prog = programNone;
-        printVerb(verb);
-        printNoun(noun);
-        printProg(prog);
-        clearRegister(1);
-        clearRegister(2);
-        clearRegister(3);
-    }
-    else if (currentProgram == programApollo13Audio) {
-        playTrack(PROBLEM);
-        currentProgram = programNone;
-        action = none;
-        verb = verbNone;
-        noun = nounNone;
-        prog = programNone;
-        printVerb(verb);
-        printNoun(noun);
-        printProg(prog);
-        clearRegister(1);
-        clearRegister(2);
-        clearRegister(3);
-    }
-    if (stbyToggle) setLamp(white, lampSTBY);
-    if (action == apollo13Startup) turnOffLampNumber(lampSTBY);
-        
-    if (mode == modeIdle) executeIdleMode();
+    checkStatusLightToggles(); // checks whether to display any status lights
+
+    //Now in the main area of the program. We need to check actions and modes
+
+    // If nothing is happening, no action, no mode, then revert to idle
+    if ((mode == modeIdle) && (action == actionNone)) executeIdleMode();
+
     else if (mode == modeInputVerb) {
         executeVerbInputMode();
         turnOffLampNumber(lampSTBY);
@@ -2156,7 +2071,7 @@ void loop()
         printProg(64);
         playTrack(4);
         delay(1000);
-        lunarDecentSim();    // V16N68
+        //lunarDecentSim();    // V16N68
     }
     else if (action == PlayAudioclip) 
     {   // V21N98 Play Audio Clip

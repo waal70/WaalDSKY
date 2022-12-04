@@ -36,15 +36,10 @@ DFPlayerMini_Fast myMP3;
 
 void soundSetup() 
 {
-	//Serial.begin(9600);
-  
+
   myMP3.begin(Serial);
- 
- 
-
   myMP3.sleep();
-  //delay(2000);
-
+  delay(20);
   myMP3.wakeUp();
 }
 
