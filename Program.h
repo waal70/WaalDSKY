@@ -159,7 +159,7 @@ byte digitValue[7][7];
 byte inputnum[5];
 int inputnumsign = plus;
 byte keyValue = keyNone;
-byte oldKey = none;
+byte oldKey = keyNone;
 bool fresh = true;
 byte action = none;
 byte currentAction = none;
@@ -179,6 +179,7 @@ byte currentProgram = programNone;
 byte prog = 0;
 byte prog_old = 0;
 byte prog_old2 = 0;
+bool prog_error = false;
 byte progNew[2];
 byte progOld[2];
 bool newProg = false;
@@ -252,24 +253,25 @@ uint32_t flashTimer;
 uint32_t pressedTimer;
 
 // This is the 1 second toggle timer
-bool toggle_timer()
+bool toggle_timer(void *argument)
 {
   global_state_1sec = !global_state_1sec;
   toggle = !toggle;
-  return true; // repeat? true
+  //Serial.println("toggle");
+  return true;
 }
 
 // 600msec toggle
-bool toggle_timer_600()
+bool toggle_timer_600(void *argument)
 {
   global_state_600msec = !global_state_600msec;
   toggle600 = !toggle600;
-   return true; // repeat? true
+  return true;
 }
 
-bool toggle_timer_250() {
+bool toggle_timer_250(void *argument) {
   toggle250 = !toggle250;
-  return true; // repeat? true
+  return true;
 }
 
 int readKeyboard() {
@@ -291,39 +293,43 @@ int readKeyboard() {
     int value_row1 = analogRead(A0);
     int value_row2 = analogRead(A1);
     int value_row3 = analogRead(A2);
+
+    int valueToReturn = keyNone;
     if ((value_row1 > oddRowDividerVoltage6)
         && (value_row2 > oddRowDividerVoltage6)
         && (value_row3 > oddRowDividerVoltage6))
     {
         return keyNone;  // no key
     }
-
     // keyboard ~top row
-    else if (value_row1 < oddRowDividerVoltage1) return keyVerb;
-    else if (value_row1 < oddRowDividerVoltage2) return keyPlus;
-    else if (value_row1 < oddRowDividerVoltage3) return keyNumber7;
-    else if (value_row1 < oddRowDividerVoltage4) return keyNumber8;
-    else if (value_row1 < oddRowDividerVoltage5) return keyNumber9;
-    else if (value_row1 < oddRowDividerVoltage6) return keyClear;
+    else if (value_row1 < oddRowDividerVoltage1) valueToReturn= keyVerb;
+    else if (value_row1 < oddRowDividerVoltage2) valueToReturn= keyPlus;
+    else if (value_row1 < oddRowDividerVoltage3) valueToReturn= keyNumber7;
+    else if (value_row1 < oddRowDividerVoltage4) valueToReturn= keyNumber8;
+    else if (value_row1 < oddRowDividerVoltage5) valueToReturn= keyNumber9;
+    else if (value_row1 < oddRowDividerVoltage6) valueToReturn= keyClear;
 
     // keyboard ~middle row
-    else if (value_row2 < evenRowDividerVoltage1) return keyNoun;
-    else if (value_row2 < evenRowDividerVoltage2) return keyMinus;
-    else if (value_row2 < evenRowDividerVoltage3) return keyNumber4;
-    else if (value_row2 < evenRowDividerVoltage4) return keyNumber5;
-    else if (value_row2 < evenRowDividerVoltage5) return keyNumber6;
-    else if (value_row2 < evenRowDividerVoltage6) return keyProceed;
-    else if (value_row2 < evenRowDividerVoltage7) return keyEnter;
+    else if (value_row2 < evenRowDividerVoltage1) valueToReturn= keyNoun;
+    else if (value_row2 < evenRowDividerVoltage2) valueToReturn= keyMinus;
+    else if (value_row2 < evenRowDividerVoltage3) valueToReturn= keyNumber4;
+    else if (value_row2 < evenRowDividerVoltage4) valueToReturn= keyNumber5;
+    else if (value_row2 < evenRowDividerVoltage5) valueToReturn= keyNumber6;
+    else if (value_row2 < evenRowDividerVoltage6) valueToReturn= keyProceed;
+    else if (value_row2 < evenRowDividerVoltage7) valueToReturn= keyEnter;
 
     // keyboard ~bottom row
-    else if (value_row3 < oddRowDividerVoltage1) return keyNumber0;
-    else if (value_row3 < oddRowDividerVoltage2) return keyNumber1;
-    else if (value_row3 < oddRowDividerVoltage3) return keyNumber2;
-    else if (value_row3 < oddRowDividerVoltage4) return keyNumber3;
-    else if (value_row3 < oddRowDividerVoltage5) return keyRelease;
-    else if (value_row3 < oddRowDividerVoltage6) return keyReset;
+    else if (value_row3 < oddRowDividerVoltage1) valueToReturn= keyNumber0;
+    else if (value_row3 < oddRowDividerVoltage2) valueToReturn= keyNumber1;
+    else if (value_row3 < oddRowDividerVoltage3) valueToReturn= keyNumber2;
+    else if (value_row3 < oddRowDividerVoltage4) valueToReturn= keyNumber3;
+    else if (value_row3 < oddRowDividerVoltage5) valueToReturn= keyRelease;
+    else if (value_row3 < oddRowDividerVoltage6) valueToReturn= keyReset;
     else {
+    	valueToReturn= keyNone;
         // no key
     }
+    if (valueToReturn != keyNone) Serial.println(valueToReturn);
+    return valueToReturn;
 }
 #endif //Program.h

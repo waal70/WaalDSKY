@@ -1,6 +1,7 @@
 #ifndef SOUND_H
 #define SOUND_H
 
+#include <DFPlayerMini_Fast.h>
 
 typedef enum TRACKS_ENUM
 {
@@ -24,6 +25,6 @@ typedef enum TRACKS_ENUM
 }TracksEnum;
 
 extern void soundSetup(void);
-extern void playTrack(uint16_t track);
+extern void playTrack(unsigned int track);
 extern void stopMP3(void);
 #endif

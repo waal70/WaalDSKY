@@ -11,6 +11,8 @@
 #define NUMPIXELS      18
 #define GPS_SW         7 
 
+#define TIMER_TASKS	   3
+
 int clipnum = COMPUTERS; //Computers now have control
 int clipcount = NUM_TRACKS -1; // Because of the enum being zero-based
 
@@ -20,10 +22,15 @@ Adafruit_NeoPixel neoPixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KH
 LedControl ledControl = LedControl(12,10,11,4);
 RTC_DS1307 realTimeClock;
 const int MPU_addr=0x69;  // I2C address of the MPU-6050
-auto timer = timer_create_default();
+//auto timer = timer_create_default();
+Timer<TIMER_TASKS> timer; //only allocate memory for TIMER_TASKS timers
 TinyGPSPlus gps; //TODO: Decide on the use of TinyGPSPlus
 uint32_t activityTimer = millis();
 uint32_t compActivityTimer = millis();
+
+//forward method declarations:
+void actionApollo13Startup();
+void compAct();
 
 void lampit(byte r, byte g, byte b , int lamp) {
     neoPixels.setPixelColor(lamp, neoPixels.Color(r,g,b)); // Set it the way we like it.
@@ -173,6 +180,7 @@ void setLamp(int color, int lampNumber)
         case white_dim:
             neoPixels.setPixelColor(lampNumber, neoPixels.Color(50,50,50));
             neoPixels.show();
+            break;
         default:
             // Statement(s)
             break; // Wird nicht benötigt, wenn Statement(s) vorhanden sind
@@ -203,8 +211,12 @@ void setDigits(){
       else {ledControl.setRow(index+1,i,B01110100);}
     }
     else {
-      if(action == 3 && index == 2 && i == 3){
-        ledControl.setDigit(index+1,i,digitValue[index + 4][i],true);
+      if(action == 3 && index == 2 && i == 3)
+      {
+    	int arg1, arg2;
+    	arg1 = index+1;
+    	char arg3 = digitValue[index+4][i];
+        ledControl.setDigit(arg1,i,arg3,true);
       }
       else{
         ledControl.setDigit(index+1,i,digitValue[index + 4][i],false);
@@ -466,12 +478,17 @@ void processIdleMode()
         }
         else if (keyValue == keyProceed) {
             // program
-            if(action != pleasePerform)
-            {
               mode = modeInputProgram;
               fresh = false;
+              byte keeper = prog;
+              for (int index = 0; keeper >= 10; keeper = (keeper - 10)) {
+                  index++; progOld[0] = index;
+              }
+              for (int index = 0;keeper >= 1; keeper = (keeper - 1)) {
+                  index++; progOld[1] = index;
+              }
+
             }
-        }
         else if (keyValue == keyReset) {
             // resrt reeor
             error = 0;
@@ -729,81 +746,92 @@ void executeNounInputMode()
 }
 
 
-void processProgramInputMode()
-{
-    if (keyValue == oldKey) {
-        fresh = false;
-    }
-    else
-    {
-        fresh = true;
-        oldKey = keyValue;
-        if ((error == 1) && (keyValue == keyClear) && (fresh == true))
-        {
-            error = 0;
-            prog = 0;
-            newProg = false;
-            mode = modeInputProgram;
-            count = 0;
-            fresh = false;
-            turnOffLampNumber(lampOprErr);
-            printProg(prog);
-        }
-        if ((keyValue == keyEnter) && (fresh == true)) 
-        {
-            fresh = false;
-            prog_old2 = prog_old;
-            prog_old = currentProgram;
-            currentProgram = ((progNew[0] * 10) + (progNew[1]));
-            prog = currentProgram;
-            fresh = false;
-            if ((currentProgram != programNone) && (currentProgram != programJFKAudio) && (currentProgram != programApollo11Audio) && (currentProgram != programApollo13Audio))
-            {
-                currentProgram = ((progOld[0] * 10) + progOld[1]);    // restore prior noun
-                prog = prog_old;
-                error = 1;
-            }
-            else
-            {
-                turnOffLampNumber(lampOprErr);
-                turnOffLampNumber(lampKeyRelease);
-                setLamp(green, lampProg);
-                mode = modeIdle;
-                count = 0;
-                fresh = false;
-                error = 0;
-                newProg = true;
-            }
-        }
-        if ((keyValue == keyRelease) && (fresh == true))
-        {
-            mode = oldMode;
-            prog = prog_old;
-            turnOffLampNumber(lampKeyRelease);
-            setLamp(green, lampProg);
-            count = 0;
-            fresh = false;
-            printProg(prog);
-        }
-        if ((keyValue <= keyNumber9) && (count < 2))
-        { // now the actual prog values are read, stored and printed
-            progNew[count] = keyValue;
-            setDigits(0, count+2, keyValue);
-            count++;
-            fresh = false;
-        }
-    }
-}
-
 void executeProgramInputMode()
-{ // inputting the program
-    setLamp(yellow, lampProg);
+{
+	if (error) Serial.println("error condition");
+    setLamp(blue, lampProg);
     toggleKeyReleaseLamp();
     if (error == 1) {
         flasher();
     }
     keyValue = readKeyboard();
     processProgramInputMode();
+}
+
+void processProgramInputMode() {
+
+	//Andre: re-try for program input mode, based on verb input mode
+	if (keyValue == oldKey) {
+	        fresh = false;
+	    }
+	    else {
+	        fresh = true;
+	        oldKey = keyValue;
+	        if ((error == 1) && (keyValue == keyReset) && (fresh == true)) {
+	            error = 0;
+	            prog_error = false;
+	            setLamp(green, lampProg);
+	            setLamp(off,lampOprErr);
+	            fresh = false;
+	        } //resrt reeor
+
+	        if ((keyValue == keyEnter) && (fresh == true)) {
+	            fresh = false;
+	            prog_old = prog;
+	            prog = ((progNew[0] * 10) + (progNew[1]));
+	            fresh = false;
+	            if ((prog != 16)
+	                  && (prog != 21)
+	                  && (prog != 35)
+	                  && (prog != programJFKAudio)
+	                  && (prog != programApollo11Audio)
+	                  && (prog != programApollo13Audio)
+	                  && (prog != programNone)) {
+	            	// none of the values correspond to a valid program.
+	            	  prog_error = true;
+	            	  error = true;
+	            	  //prog = ((progOld[0] * 10) + progOld[1]); //restore prior prog
+	            	  setLamp(green, lampProg);
+	            }
+	            else {
+	            	prog = ((progOld[0] * 10) + progOld[1]);
+	                turnOffLampNumber(lampOprErr);
+	                turnOffLampNumber(lampKeyRelease);
+	                setLamp(green, lampProg);
+	                currentProgram = prog;
+	                mode = modeIdle;
+	                count = 0;
+	                fresh = false;
+	                error = false;
+	                prog_error = false;
+	                newAction = true;
+	            }
+	        }
+	        if (keyValue != oldKey) {
+	                fresh = true;
+	                oldKey = keyValue;
+	            }
+
+	        if ((keyValue == keyRelease) && (fresh == true)) {
+	            mode = oldMode;
+	            turnOffLampNumber(lampKeyRelease);
+	            setLamp(green, lampProg);
+	            count = 0;
+	            fresh = false;
+	        }
+	        if ((keyValue == keyVerb) && (fresh == true)) {
+	            //verb
+	            mode = modeInputVerb;
+	            setLamp(green, lampNoun);
+	            count = 0;
+	            fresh = false;
+	        }
+	        if ((keyValue <= keyNumber9) && (count < 2)) {
+	            progNew[count] = keyValue;
+	            setDigits(0, (count + 2), keyValue);
+	            count++;
+	        }
+	    }
 }
 
 //void processkeytime() {
@@ -1120,7 +1148,7 @@ void actionApollo13Startup()
   printVerb(verb);
   pressedDuration = 0;
   pressedDuration2 = 0;
-  action = actionReadTime;
+  action = displayRealTimeClock;
   validateAction();
 }
 void actionStandbyMode(){
@@ -1233,69 +1261,7 @@ void actionReadTime()
 void actionReadGPS()
 { // Read GPS
   setLamp(white, lampNoAtt);
-//  if (gpsfix == false)
-//    {
-//      if (flashTimer > millis())  flashTimer = millis();
-//      if (millis() - flashTimer >= 500 && millis() - flashTimer < 1000) 
-//      {
-//        setLamp(yellow, lampTracker);
-//      }
-//      if (millis() - flashTimer >= 1000) 
-//      {
-//        setLamp(off, lampTracker);
-//        flashTimer = millis(); // reset the timer
-//      }
-//      setLamp(off, lampAlt);
-//      setLamp(off, lampVel);
-//    }
-//    else if (gpsfix == true)
-//    {
-//        setLamp(off, lampTracker);
-//        setLamp(white, lampAlt);
-//        setLamp(yellow, lampVel);
-//    }
-//  if (toggle == true && gpsread == true)
-//  {
-//    //ALT_light_on()
-//    digitalWrite(GPS_SW,HIGH);
-//    delay(100);
-//    gpsread = false;
-    // int index = 0;
-//    Serial.begin(9600);
-    //delay(200);
-//    while((Serial.available()) && (GPS_READ_STARTED == true))
-//    {
-//      setLamp(white, lampAlt);
-//      if (gps.encode(Serial.read()))
-//      {
-//         //setLamp(orange, lampPosition);
-//         setLamp(orange, lampVel);
-//         GPS_READ_STARTED = false;
-//          setLamp(off, lampTracker);
-//      }
-//    }
-//    digitalWrite(GPS_SW,LOW);
-   
-    //if (gps.location.lat() != 0)
-//    if (gps.location.isValid() == 1)
-//    {
-//        gpsfix = true;
-//    } 
-    //else if (gps.location.lat() == 0)
-//    else if (gps.location.isValid() != 1)
-//    {
-//        gpsfix = false;
-//    }
-//    printRegister(1,gps.location.lat()*100);
-//    printRegister(2,gps.location.lng()*100);
-//    printRegister(3,gps.altitude.meters());
-//  }
-//  if (toggle == false)
-//  {
-//     gpsread = true;
-//     GPS_READ_STARTED = true;
-//  }
-  digitalWrite(7,HIGH);
+  digitalWrite(GPS_SW,HIGH);
   delay(20);
    byte data[83];
   while((Serial.available()) > 0) {int x =  Serial.read(); }
@@ -1329,7 +1295,7 @@ void actionReadGPS()
    valueForDisplay[4] = lat;
    valueForDisplay[5] = lon;
    valueForDisplay[6] = alt;
-   digitalWrite(7,LOW);
+   digitalWrite(GPS_SW,LOW);
    setDigits();  
 }
 
@@ -1632,6 +1598,14 @@ void actionReadIMU(int imumode)
         imutoggle = true;
         readIMU(imumode);
     }
+}
+
+void compAct(){
+ int randNumb = random(10, 30);
+ if ((randNumb == 15) || (randNumb == 20) || randNumb == 4 || randNumb == 17 || randNumb > 25) {lampit(0,150,0,3);}
+ else {lampit(0,0,0,3);}
+ if (randNumb == 9 || randNumb == 3 || randNumb == 27 || randNumb == 19 || randNumb == 6 || randNumb == 15) {lampit(90,90,90,17);}
+ else {lampit(0,0,0,17);}
 }
 
 void lunarDecentSim(){
@@ -1944,13 +1918,6 @@ void lunarDecentSim(){
     }
  }
 
- void compAct(){
-  int randNumb = random(10, 30); 
-  if ((randNumb == 15) || (randNumb == 20) || randNumb == 4 || randNumb == 17 || randNumb > 25) {lampit(0,150,0,3);}
-  else {lampit(0,0,0,3);}
-  if (randNumb == 9 || randNumb == 3 || randNumb == 27 || randNumb == 19 || randNumb == 6 || randNumb == 15) {lampit(90,90,90,17);}
-  else {lampit(0,0,0,17);}
-}
 
 void startUp() {
   for (int index = 0; index < 4; index++){lampit(0,0,0, index);delay(200);lampit(0,150,0, index);}
@@ -2089,7 +2056,6 @@ void loop()
     checkClockIndic(); // checks whether to display the clock pixel
 
     if (currentProgram == programJFKAudio) {
-        //jfk(4);
         playTrack(JFK);
         currentProgram = programNone;
         action = none;
@@ -2118,7 +2084,6 @@ void loop()
         clearRegister(3);
     }
     else if (currentProgram == programApollo13Audio) {
-        //jfk(3);
         playTrack(PROBLEM);
         currentProgram = programNone;
         action = none;
