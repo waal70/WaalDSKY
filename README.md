@@ -19,7 +19,7 @@ Where possible, it mimics the Apollo 11 AGC, using the excellent simulator: http
 | 16 | 68 | Apollo 11 Lunar Landing Simulation |
 | 21 | 98 | Play a sound from table below | 
 | 35 | 00 | Lamp Test |
-| 37 | 00 | Idle Mode (P00) |
+| 37 | 06 | Standby-mode (PRO to proceed) |
 
 ## MP3 files on the SD-card:
 The software makes reference to the following mp3-files.
