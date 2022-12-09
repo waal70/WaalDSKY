@@ -61,6 +61,10 @@ void validateAction()
 			mode = modeStandby;
 			newAction = false;
 			break; //nounStandby
+		default:
+			action = actionNone;
+			newAction = false;
+			break; //probably no noun set yet
 		}
 		break; //verbChangeProgram
 	case verbPleasePerform:
@@ -68,7 +72,9 @@ void validateAction()
 		newAction = false;
 		break;
 	case verbDisplayDecimal: //V16
-		switch (noun){
+		Serial.println("case switch display decimal");
+		switch (noun)
+		{
 		case nounApollo13StartUp: //V16N
 			action = apollo13Startup;
 			newAction=false;
@@ -101,9 +107,12 @@ void validateAction()
 			action = lunarDescent;
 			newAction = false;
 			break;
+		default:
+			action = actionNone;
+			newAction = false;
+			break; //probably no noun set yet
+		}
 		break; //display decimal
-		} //switch noun
-		break; //case displaydecimal
 		case verbSetComponent:
 			switch (noun) {
 			case nounClockTime:
@@ -118,6 +127,10 @@ void validateAction()
 				action = PlayAudioclip;
 				newAction = false;
 				break;
+			default:
+				action = actionNone;
+				newAction = false;
+				break; //probably no noun set yet
 			}
 			break; //verbSetComponent
 			default:
@@ -630,8 +643,7 @@ void processNounInputMode()
 		newKeyPressed = true;
 		oldKeyValue = keyValue;
 		if ((isError(errorMaster)) && (keyValue == keyReset)) {
-			clearSpecificError(errorMaster);
-			clearSpecificError(errorNoun);
+			clearAllErrors();
 			setLamp(green, lampNoun);
 			turnOffLampNumber(lampOprErr);
 			newKeyPressed = false;
@@ -667,38 +679,42 @@ void processNounInputMode()
 				clearAllErrors();
 				newAction = true;
 			}
-		}        }
-	if ((keyValue == keyRelease) && (newKeyPressed)) {
-		mode = modeOld;
-		turnOffLampNumber(lampKeyRelease);
-		setLamp(green, lampNoun);
-		count = 0;
-		newKeyPressed = false;
-		if (noun == nounNone) {
-			printNoun(noun);
-		}
-		else {
-			printNoun((nounOld[0] * 10) + nounOld[1]);
 		}
 	}
-	if ((keyValue == keyVerb) && (newKeyPressed)) {
+	if (newKeyPressed) {
+		if (keyValue == keyRelease) {
+			mode = modeOld;
+			turnOffLampNumber(lampKeyRelease);
+			setLamp(green, lampNoun);
+			count = 0;
+			newKeyPressed = false;
+			if (noun == nounNone) {
+				printNoun(noun);
+			}
+			else {
+				printNoun(noun);
+			}
+		}
+		else if (keyValue == keyVerb) {
 		//verb
 		mode = modeInputVerb;
 		setLamp(green, lampNoun);
 		count = 0;
 		newKeyPressed = false;
-	}
-	if ((keyValue == keyProceed) && (newKeyPressed)) {
+		}
+		else if (keyValue == keyProceed) {
 		mode = modeInputProgram;
 		setLamp(green, lampNoun);
 		count = 0;
 		newKeyPressed = false;
 	}
-	if ((keyValue <= keyNumber9) && (count < 2)) {
+
+	if ((keyValue <= keyNumber9) && (count <= 2)) {
 		nounNew[count] = keyValue;
 		setDigits(0, (count + 4), keyValue);
 		count++;
-		newKeyPressed = false;
+		//newKeyPressed = false;
+		}
 	}
 }
 

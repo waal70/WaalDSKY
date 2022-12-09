@@ -207,7 +207,7 @@ bool globalError = false;
 bool newAction = false;
 
 // contains whether a new key was detected
-bool newKeyPressed = false;
+bool newKeyPressed = true;
 
 //TODO: clear this mess
 // variable to hold on count up
