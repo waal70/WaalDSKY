@@ -42,6 +42,15 @@ void lampit(byte r, byte g, byte b , int lamp) {
 
 void(* resetFunc) (void) = 0; //declare reset function at address 0
 
+void noValidNounOrVerb() {
+	// Looping through the input loop, no valid noun was input (yet)
+	// Therefore: reset to default looping conditions.
+	// Also useful whilst inputting Verb, in order to wait for
+	// valid verb condition
+	action = actionNone;
+	newAction = false;
+}
+
 void validateAction()
 {
 //TODO: implement switch cases here
@@ -62,8 +71,7 @@ void validateAction()
 			newAction = false;
 			break; //nounStandby
 		default:
-			action = actionNone;
-			newAction = false;
+			noValidNounOrVerb();
 			break; //probably no noun set yet
 		}
 		break; //verbChangeProgram
@@ -72,7 +80,7 @@ void validateAction()
 		newAction = false;
 		break;
 	case verbDisplayDecimal: //V16
-		Serial.println("case switch display decimal");
+		//Serial.println("case switch display decimal");
 		switch (noun)
 		{
 		case nounApollo13StartUp: //V16N
@@ -108,8 +116,7 @@ void validateAction()
 			newAction = false;
 			break;
 		default:
-			action = actionNone;
-			newAction = false;
+			noValidNounOrVerb();
 			break; //probably no noun set yet
 		}
 		break; //display decimal
@@ -128,14 +135,12 @@ void validateAction()
 				newAction = false;
 				break;
 			default:
-				action = actionNone;
-				newAction = false;
+				noValidNounOrVerb();
 				break; //probably no noun set yet
 			}
 			break; //verbSetComponent
 			default:
-				action = actionNone;
-				newAction = false;
+				noValidNounOrVerb();
 				break;
 	}
 }
@@ -2024,6 +2029,7 @@ void setup()
   setInitialState();
 
   while (!Serial); //in case we're connected via USB, wait until Serial becomes available;
+  playTrack(COMPUTERS);
 }
 
 void loop()
