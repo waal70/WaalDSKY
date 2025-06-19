@@ -8,8 +8,6 @@
 #include "Program.h"
 #include "Sound.h"
 
-// trigger change
-
 #define PIN            6
 #define NUMPIXELS      18
 #define GPS_SW         7 
